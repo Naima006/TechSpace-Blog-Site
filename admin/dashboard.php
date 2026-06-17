@@ -5,26 +5,19 @@ require_once __DIR__ . '/../db.php';
 /** 🔒 SECURE SESSION MANAGEMENT TIMEOUT LAYER */
 if (isset($_SESSION['admin_id'])) {
     $current_timestamp = time();
-    $timeout_duration = 1800; // (30min * 60)
+    $timeout_duration = 600; // (10min * 60)
 
-    // Check if our tracking stamp node exists in server memory
     if (isset($_SESSION['last_activity'])) {
-        // Calculate the exact elapsed idle duration delta
         $seconds_idle = $current_timestamp - $_SESSION['last_activity'];
-
-        // If the elapsed duration matches or exceeds 30 minutes, execute defensive wipe
         if ($seconds_idle >= $timeout_duration) {
-            session_unset();     // Strip all active runtime global session keys
-            session_destroy();   // Completely drop the temporary server file footprint
+            session_unset();
+            session_destroy();
             header("Location: index.php?session_expired=1");
             exit();
         }
     }
-    
-    // If the check passes, push a fresh current timestamp to reset the 30-minute clock
     $_SESSION['last_activity'] = $current_timestamp;
 } else {
-    // If an unauthenticated request attempts to sneak in, redirect to login terminal
     header("Location: index.php");
     exit();
 }
@@ -55,7 +48,7 @@ if (isset($_GET['delete_author'])) {
     exit();
 }
 
-/** HELPER FUNCTION TO CHOREOGRAPH LOCAL FILE UPLOADS */
+/** HELPER FUNCTION FOR LOCAL FILE UPLOADS */
 function process_image_upload($file_array) {
     if (isset($file_array) && $file_array['error'] === UPLOAD_ERR_OK) {
         $source_path = $file_array['tmp_name'];
@@ -97,6 +90,17 @@ if (isset($_POST['update_author'])) {
         mysqli_query($conn, "UPDATE authors SET author_name='$auth_name' $avatar_update_sql WHERE author_id=$auth_id");
     }
     header("Location: dashboard.php?action_mode=authors_panel");
+    exit();
+}
+
+/** UPDATE DYNAMIC WEBSITE SETTINGS LAYER */
+if (isset($_POST['save_settings'])) {
+    foreach ($_POST['settings'] as $key => $value) {
+        $safe_key = mysqli_real_escape_string($conn, $key);
+        $safe_value = mysqli_real_escape_string($conn, $value);
+        mysqli_query($conn, "INSERT INTO site_settings (setting_key, setting_value) VALUES ('$safe_key', '$safe_value') ON DUPLICATE KEY UPDATE setting_value='$safe_value'");
+    }
+    header("Location: dashboard.php");
     exit();
 }
 
@@ -206,9 +210,16 @@ while ($auth_row = mysqli_fetch_assoc($authors_query)) {
     $authors[] = $auth_row;
 }
 
+// Fetch all dynamic settings rows into a mapping dictionary array map
+$settings_query = mysqli_query($conn, "SELECT * FROM site_settings");
+$site = [];
+while ($set_row = mysqli_fetch_assoc($settings_query)) {
+    $site[$set_row['setting_key']] = $set_row['setting_value'];
+}
+
 $total_rows = mysqli_num_rows($posts);
-$is_overlay_active = ($view_post || $edit_post || $edit_author_ctx || isset($_GET['action_mode'])) ? 'true' : 'false';
-$dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === 'author' || $edit_author_ctx) ? 'dashboard.php?action_mode=authors_panel' : 'dashboard.php';
+$is_overlay_active = ($view_post || $edit_post || $edit_author_ctx || (isset($_GET['action_mode']) && $_GET['action_mode'] !== 'settings')) ? 'true' : 'false';
+$dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 'author' || $edit_author_ctx)) ? 'dashboard.php?action_mode=authors_panel' : 'dashboard.php';
 ?>
 
 <!DOCTYPE html>
@@ -218,6 +229,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
     <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="../style.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
@@ -259,7 +271,6 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
                 </div>
 
                 <h1 class="inspect-article-title"><?php echo htmlspecialchars($view_post['title']); ?></h1>
-                
                 <div class="inspect-article-body"><?php echo htmlspecialchars($view_post['content']); ?></div>
 
                 <div class="inspect-action-footer-toolbar">
@@ -279,9 +290,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
         </div>
     <?php } ?>
 
-    <?php 
-    if ($edit_post || $edit_author_ctx || (isset($_GET['action_mode']) && ($_GET['action_mode'] === 'author' || $_GET['action_mode'] === 'create'))) { 
-    ?>
+    <?php if ($edit_post || $edit_author_ctx || isset($_GET['action_mode'])) { ?>
         
         <?php if ((isset($_GET['action_mode']) && $_GET['action_mode'] === 'author') || $edit_author_ctx) { ?>
             <div class="form-card action-focus-card">
@@ -316,6 +325,100 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
                     </div>
                 </form>
             </div>
+
+        <?php } elseif (isset($_GET['action_mode']) && $_GET['action_mode'] === 'settings') { ?>
+            <div class="live-builder-split-grid">
+                
+                <div class="form-card" style="margin: 0; animation: unset;">
+                    <div class="form-card-header" style="margin-bottom: 15px; padding-bottom: 10px;">
+                        <h3><i class="fa-solid fa-sliders-up text-blue-icon"></i> Style Control Panel</h3>
+                        <a href="dashboard.php" class="close-workspace-btn"><i class="fa-solid fa-xmark"></i></a>
+                    </div>
+                    
+                    <form method="POST" action="dashboard.php" style="gap: 12px;">
+                        <div class="builder-scroll-zone">
+                            <div class="input-group">
+                                <label>Header Website Tagline</label>
+                                <input type="text" id="input_site_slogan" name="settings[site_slogan]" value="<?php echo htmlspecialchars($site['site_slogan'] ?? ''); ?>">
+                            </div>
+                            <div class="input-group">
+                                <label>About View Title Header</label>
+                                <input type="text" id="input_about_heading" name="settings[about_heading]" value="<?php echo htmlspecialchars($site['about_heading'] ?? ''); ?>">
+                            </div>
+                            <div class="input-group">
+                                <label>About Content Description</label>
+                                <textarea id="input_about_text" name="settings[about_text]"><?php echo htmlspecialchars($site['about_text'] ?? ''); ?></textarea>
+                            </div>
+                            <div class="input-group">
+                                <label>Contact View Title Header</label>
+                                <input type="text" id="input_contact_heading" name="settings[contact_heading]" value="<?php echo htmlspecialchars($site['contact_heading'] ?? ''); ?>">
+                            </div>
+                            <div class="input-group">
+                                <label>Support Email Address</label>
+                                <input type="text" id="input_contact_email" name="settings[contact_email]" value="<?php echo htmlspecialchars($site['contact_email'] ?? ''); ?>">
+                            </div>
+                            <div class="input-group">
+                                <label>Support Helpdesk Phone</label>
+                                <input type="text" id="input_contact_phone" name="settings[contact_phone]" value="<?php echo htmlspecialchars($site['contact_phone'] ?? ''); ?>">
+                            </div>
+                            <div class="input-group">
+                                <label>Contact Location</label>
+                                <input type="text" id="input_contact_location" name="settings[contact_location]" value="<?php echo htmlspecialchars($site['contact_location'] ?? ''); ?>">
+                            </div>
+                            <div class="input-group">
+                                <label>CTA Heading</label>
+                                <input type="text" id="input_cta_heading" name="settings[cta_heading]" value="<?php echo htmlspecialchars($site['cta_heading'] ?? ''); ?>">
+                            </div>
+                            <div class="input-group">
+                                <label>CTA Description Text</label>
+                                <textarea id="input_cta_text" name="settings[cta_text]"><?php echo htmlspecialchars($site['cta_text'] ?? ''); ?></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-button-cluster" style="margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 15px;">
+                            <button type="submit" name="save_settings" class="submit-action-btn" style="min-width: unset; width: 100%;"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
+                            <a href="dashboard.php" class="cancel-action-btn" style="width: 100%; text-align: center;"><i class="fa-solid fa-times"></i> Dismiss</a>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="live-sandbox-preview-frame">
+                    <div class="sandbox-overlay-badge"><i class="fa-solid fa-wand-magic-sparkles"></i> Active Sandbox Live Preview Canvas</div>
+                    
+                    <div class="sandbox-scale-wrapper">
+                        <header style="margin-bottom: 20px;">
+                            <div class="logo-container">
+                                <i class="fa-solid fa-microchip logo-icon"></i>
+                                <h1 style="font-size: 24px; color: white; display: inline; margin-left: 8px;">TechSpace</h1>
+                            </div>
+                            <p id="live_site_slogan" style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;"><?php echo htmlspecialchars($site['site_slogan'] ?? ''); ?></p>
+                        </header>
+
+                        <div class="page-card" style="margin-bottom: 20px; padding: 20px;">
+                            <h2 id="live_about_heading" style="font-size: 18px; margin-bottom: 10px; color: white;"><?php echo htmlspecialchars($site['about_heading'] ?? ''); ?></h2>
+                            <p id="live_about_text" style="font-size: 12px; line-height: 1.6; color: var(--text-secondary);"><?php echo htmlspecialchars($site['about_text'] ?? ''); ?></p>
+                        </div>
+
+                        <div class="page-card" style="margin-bottom: 20px; padding: 20px;">
+                            <h2 id="live_contact_heading" style="font-size: 18px; margin-bottom: 10px; color: white;"><?php echo htmlspecialchars($site['contact_heading'] ?? ''); ?></h2>
+                            <div class="contact-info" style="gap: 8px; margin-top: 10px; font-size: 12px;">
+                                <div class="contact-item"><i class="fa-solid fa-envelope" style="color: var(--accent-blue);"></i> <span id="live_contact_email"><?php echo htmlspecialchars($site['contact_email'] ?? ''); ?></span></div>
+                                <div class="contact-item"><i class="fa-solid fa-phone" style="color: var(--accent-blue);"></i> <span id="live_contact_phone"><?php echo htmlspecialchars($site['contact_phone'] ?? ''); ?></span></div>
+                                <div class="contact-item"><i class="fa-solid fa-location-dot" style="color: var(--accent-blue);"></i> <span id="live_contact_location"><?php echo htmlspecialchars($site['contact_location'] ?? ''); ?></span></div>
+                            </div>
+                        </div>
+
+                        <section class="cta-section" style="padding: 0; margin-top: 10px;">
+                            <div class="cta-card" style="padding: 20px; border-radius: 14px;">
+                                <h2 id="live_cta_heading" style="font-size: 16px; margin-bottom: 8px; color: white; text-align: center; font-weight: 700;"><?php echo htmlspecialchars($site['cta_heading'] ?? ''); ?></h2>
+                                <p id="live_cta_text" style="font-size: 11px; text-align: center; color: rgba(255,255,255,0.7); max-width: 100%;"><?php echo htmlspecialchars($site['cta_text'] ?? ''); ?></p>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+            </div>
+
         <?php } elseif ($edit_post || (isset($_GET['action_mode']) && $_GET['action_mode'] === 'create')) { ?>
             <div class="form-card action-focus-card">
                 <div class="form-card-header">
@@ -362,15 +465,6 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
                         </div>
                     </div>
 
-                    <div class="form-input-grid" style="margin-top: 15px; grid-template-columns: 1fr;">
-                        <div class="input-group checkbox-align" style="padding-top: 0; justify-content: flex-start;">
-                            <label class="checkbox context-checkbox">
-                                <input type="checkbox" name="is_popular" class="popular-toggle-box"
-                                    <?php if ($edit_post && $edit_post['is_popular']) echo "checked"; ?>>
-                                <span>Mark as Popular</span>
-                            </label>
-                        </div>
-                    </div>
 
                     <div class="input-group" style="margin-top: 15px;">
                         <label>Content Body</label>
@@ -392,7 +486,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
 
     <?php if (!isset($_GET['view'])) { ?>
         
-        <?php if (isset($_GET['action_mode']) && $_GET['action_mode'] === 'authors_panel') { ?>
+        <?php if (isset($_GET['action_mode']) && ($_GET['action_mode'] === 'authors_panel' || isset($_GET['edit_author']))) { ?>
             <div class="posts-card">
                 <div class="table-header-action-row">
                     <div class="table-title-area">
@@ -404,7 +498,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
                             <i class="fa-solid fa-arrow-left"></i> Back
                         </a>
                         <a href="dashboard.php?action_mode=author" class="initialize-creation-btn" style="background: rgba(167, 139, 250, 0.1); color: var(--accent-purple); border-color: rgba(167, 139, 250, 0.25);">
-                            <i class="fa-solid fa-user-plus"></i> Register New Author
+                            <i class="fa-solid fa-user-plus"></i> Register New Author Entry
                         </a>
                     </div>
                 </div>
@@ -472,6 +566,9 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
                         <p class="row-count-tracker">Showing <?php echo $total_rows; ?> posts</p>
                     </div>
                     <div style="display: flex; gap: 12px;">
+                        <a href="dashboard.php?action_mode=settings" class="initialize-creation-btn" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; border-color: rgba(56, 189, 248, 0.25);">
+                            <i class="fa-solid fa-sliders-up"></i> Site Settings Panel
+                        </a>
                         <a href="dashboard.php?action_mode=authors_panel" class="initialize-creation-btn" style="background: rgba(167, 139, 250, 0.1); color: var(--accent-purple); border-color: rgba(167, 139, 250, 0.25);">
                             <i class="fa-solid fa-users-gear"></i> Author Management
                         </a>
@@ -514,11 +611,17 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
                                             </div>
                                         </td>
                                         <td>
-                                            <?php if ($p['is_popular']) { ?>
-                                                <span class="popular-status-pill"><i class="fa-solid fa-fire-flame-curved"></i> Popular</span>
-                                            <?php } else { ?>
-                                                <span class="standard-dash-pill">—</span>
-                                            <?php } ?>
+                                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                                <span style="font-size: 13px; color: #e5e7eb; font-weight: 500;">
+                                                    <i class="fa-regular fa-eye" style="color: var(--accent-blue); margin-right: 4px;"></i> 
+                                                    <?php echo number_format($p['view_count']); ?> views
+                                                </span>
+                                                <?php if ($p['view_count'] > 500) { ?>
+                                                    <span class="popular-status-pill" style="width: max-content; padding: 2px 8px; font-size: 11px;">
+                                                        <i class="fa-solid fa-fire-flame-curved"></i> Popular
+                                                    </span>
+                                                <?php } ?>
+                                            </div>
                                         </td>
                                         <td style="text-align: right; padding-right: 20px;">
                                             <div class="operation-icon-actions-cluster">
@@ -529,7 +632,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
                                                     <i class="fa-solid fa-pencil"></i>
                                                 </a>
                                                 <a href="dashboard.php?delete=<?php echo $p['post_id']; ?>" 
-                                                   onclick="return confirm('Drop records permanently from this table row?')" class="op-btn drop-view" title="Purge Record">
+                                                onclick="return confirm('Drop records permanently from this table row?')" class="op-btn drop-view" title="Purge Record">
                                                     <i class="fa-solid fa-trash-can"></i>
                                                 </a>
                                             </div>
@@ -561,19 +664,46 @@ $dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === '
 document.addEventListener("DOMContentLoaded", function() {
     const overlayConditionActive = <?php echo $is_overlay_active; ?>;
     
+    // --- DISMISSAL DETECTION MODULE ---
     if (overlayConditionActive) {
         const viewportBackdrop = document.getElementById("dashboardViewportBackdrop");
-        const contentMatrix = document.getElementById("dashboardContentMatrix");
         
         viewportBackdrop.style.cursor = "pointer";
-        
         viewportBackdrop.addEventListener("click", function(event) {
-            const isClickInsideCard = contentMatrix.contains(event.target);
-            if (!isClickInsideCard) {
+            // Find closest parent matrix blocks to see if the click fell into empty gaps
+            const insideWorkspaceForm = event.target.closest('.form-card');
+            const insideInspectViewCard = event.target.closest('.inspect-view-card');
+            const insideHeader = event.target.closest('.dashboard-header');
+            
+            if (!insideWorkspaceForm && !insideInspectViewCard && !insideHeader) {
                 window.location.href = "<?php echo $dismiss_target_url; ?>";
             }
         });
     }
+
+    // --- 🔮 LIVE BUILDER ---
+    const bindings = [
+        { inputId: 'input_site_slogan', targetId: 'live_site_slogan' },
+        { inputId: 'input_about_heading', targetId: 'live_about_heading' },
+        { inputId: 'input_about_text', targetId: 'live_about_text' },
+        { inputId: 'input_contact_heading', targetId: 'live_contact_heading' },
+        { inputId: 'input_contact_email', targetId: 'live_contact_email' },
+        { inputId: 'input_contact_phone', targetId: 'live_contact_phone' },
+        { inputId: 'input_contact_location', targetId: 'live_contact_location' },
+        { inputId: 'input_cta_heading', targetId: 'live_cta_heading' },
+        { inputId: 'input_cta_text', targetId: 'live_cta_text' }
+    ];
+
+    bindings.forEach(binding => {
+        const inputField = document.getElementById(binding.inputId);
+        const previewElement = document.getElementById(binding.targetId);
+        
+        if (inputField && previewElement) {
+            inputField.addEventListener('input', function() {
+                previewElement.innerText = this.value;
+            });
+        }
+    });
 });
 </script>
 

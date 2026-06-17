@@ -801,6 +801,79 @@ body::after {
     box-shadow: 0 6px 15px rgba(239, 68, 68, 0.2);
 }
 
+/* --- 🛠️ SITE BUILDER LAYOUT ARC CONFIGURATION --- */
+.live-builder-split-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    align-items: start;
+    width: 100%;
+}
+
+.builder-scroll-zone {
+    max-height: 480px;
+    overflow-y: auto;
+    padding-right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Custom scroll bar formatting matching our glassmorphic canvas track values */
+.builder-scroll-zone::-webkit-scrollbar {
+    width: 6px;
+}
+.builder-scroll-zone::-webkit-scrollbar-track {
+    background: transparent;
+}
+.builder-scroll-zone::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: 10px;
+}
+
+.live-sandbox-preview-frame {
+    background: #060912;
+    border: 1px dashed rgba(96, 165, 250, 0.25);
+    border-radius: 20px;
+    padding: 30px;
+    position: relative;
+    overflow: hidden;
+    height: 640px;
+}
+
+.sandbox-overlay-badge {
+    position: absolute;
+    top: 12px;
+    right: 15px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-blue);
+    background: rgba(96, 165, 250, 0.1);
+    padding: 4px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.25px;
+    text-transform: uppercase;
+    z-index: 10;
+}
+
+.sandbox-scale-wrapper {
+    transform: scale(0.9);
+    transform-origin: top left;
+    width: 111%; 
+    height: 111%;
+    pointer-events: none;
+    user-select: none;
+}
+
+@media(max-width: 1100px) {
+    .live-builder-split-grid {
+        grid-template-columns: 1fr;
+    }
+    .live-sandbox-preview-frame {
+        display: none;
+    }
+}
+
 @media (max-width: 768px) {
     .inspect-main-content-area {
         padding: 25px 20px;
