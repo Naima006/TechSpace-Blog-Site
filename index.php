@@ -133,9 +133,7 @@ $archives = mysqli_query(
                 <h2>About TechSpace</h2>
                 <p>
                     TechSpace is a modern tech blog platform designed to share insights about Artificial Intelligence,
-                    software engineering, cybersecurity, and emerging technologies.<br><br>
-
-                    Our goal is to make complex technology topics simple, readable, and engaging for everyone.
+                    software engineering, cybersecurity, and emerging technologies. Our goal is to make complex technology topics simple, readable, and engaging for everyone.
                 </p>
             </div>
 
@@ -161,7 +159,7 @@ $archives = mysqli_query(
 
                     <div class="contact-item">
                         <i class="fa-solid fa-location-dot"></i>
-                        <span>Dhaka, Bangladesh</span>
+                        <span>Sylhet, Bangladesh</span>
                     </div>
                 </div>
             </div>
