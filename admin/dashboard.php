@@ -2,13 +2,34 @@
 session_start();
 require_once __DIR__ . '/../db.php';
 
-/** Simple auth check */
-if (!isset($_SESSION['admin_id'])) {
+/** 🔒 SECURE SESSION MANAGEMENT TIMEOUT LAYER */
+if (isset($_SESSION['admin_id'])) {
+    $current_timestamp = time();
+    $timeout_duration = 1800; // (30min * 60)
+
+    // Check if our tracking stamp node exists in server memory
+    if (isset($_SESSION['last_activity'])) {
+        // Calculate the exact elapsed idle duration delta
+        $seconds_idle = $current_timestamp - $_SESSION['last_activity'];
+
+        // If the elapsed duration matches or exceeds 30 minutes, execute defensive wipe
+        if ($seconds_idle >= $timeout_duration) {
+            session_unset();     // Strip all active runtime global session keys
+            session_destroy();   // Completely drop the temporary server file footprint
+            header("Location: index.php?session_expired=1");
+            exit();
+        }
+    }
+    
+    // If the check passes, push a fresh current timestamp to reset the 30-minute clock
+    $_SESSION['last_activity'] = $current_timestamp;
+} else {
+    // If an unauthenticated request attempts to sneak in, redirect to login terminal
     header("Location: index.php");
     exit();
 }
 
-/** Logout & Secure Clear Action - Updated to target the admin sign-in form */
+/** Logout & Secure Clear Action */
 if (isset($_GET['logout'])) {
     session_destroy();
     header("Location: index.php");
@@ -23,21 +44,29 @@ if (isset($_GET['delete'])) {
     exit();
 }
 
+/** DELETE AUTHOR DIRECTLY */
+if (isset($_GET['delete_author'])) {
+    $auth_id = (int)$_GET['delete_author'];
+    $check_posts = mysqli_query($conn, "SELECT post_id FROM blog_posts WHERE author_id=$auth_id");
+    if (mysqli_num_rows($check_posts) == 0) {
+        mysqli_query($conn, "DELETE FROM authors WHERE author_id=$auth_id");
+    }
+    header("Location: dashboard.php?action_mode=authors_panel");
+    exit();
+}
+
 /** HELPER FUNCTION TO CHOREOGRAPH LOCAL FILE UPLOADS */
 function process_image_upload($file_array) {
     if (isset($file_array) && $file_array['error'] === UPLOAD_ERR_OK) {
         $source_path = $file_array['tmp_name'];
         $original_name = basename($file_array['name']);
-        
-        // Clean filename to match standard naming conventions
         $clean_name = time() . "_" . preg_replace("/[^A-Za-z0-9.\-_]/", "", $original_name);
         
-        // Root destination path (C:/xampp/htdocs/blog-site/)
         $target_directory = __DIR__ . '/../';
         $destination_path = $target_directory . $clean_name;
 
         if (move_uploaded_file($source_path, $destination_path)) {
-            return $clean_name; // Return string route path to write to MySQL columns
+            return $clean_name;
         }
     }
     return null;
@@ -46,17 +75,28 @@ function process_image_upload($file_array) {
 /** ADD AUTHOR DIRECTLY */
 if (isset($_POST['add_author'])) {
     $auth_name = mysqli_real_escape_string($conn, $_POST['author_name']);
-    
-    // Process profile picture file stream upload
     $auth_avatar = process_image_upload($_FILES['author_avatar_file']);
-    if (!$auth_avatar) {
-        $auth_avatar = 'avatar1.png'; // Failover fallback asset default node
-    }
+    if (!$auth_avatar) { $auth_avatar = 'avatar1.png'; }
     
     if (!empty($auth_name)) {
         mysqli_query($conn, "INSERT INTO authors (author_name, avatar_url) VALUES ('$auth_name', '$auth_avatar')");
     }
-    header("Location: dashboard.php");
+    header("Location: dashboard.php?action_mode=authors_panel");
+    exit();
+}
+
+/** UPDATE AUTHOR PROPERTIES DIRECTLY */
+if (isset($_POST['update_author'])) {
+    $auth_id = (int)$_POST['author_id'];
+    $auth_name = mysqli_real_escape_string($conn, $_POST['author_name']);
+    
+    $new_avatar = process_image_upload($_FILES['author_avatar_file']);
+    $avatar_update_sql = $new_avatar ? ", avatar_url='$new_avatar'" : "";
+    
+    if (!empty($auth_name)) {
+        mysqli_query($conn, "UPDATE authors SET author_name='$auth_name' $avatar_update_sql WHERE author_id=$auth_id");
+    }
+    header("Location: dashboard.php?action_mode=authors_panel");
     exit();
 }
 
@@ -67,11 +107,9 @@ if (isset($_POST['add_post'])) {
     $author_id = (int)$_POST['author_id'];
     $is_popular = isset($_POST['is_popular']) ? 1 : 0;
 
-    // Handle incoming file stream architectures cleanly
     $cover = process_image_upload($_FILES['cover_image_file']);
     $post_avatar = process_image_upload($_FILES['post_author_avatar_file']);
 
-    // Failover fallback check if no new upload stream is supplied
     if (!$cover) { $cover = 'blog1.png'; }
 
     mysqli_query($conn,
@@ -102,6 +140,14 @@ if (isset($_GET['edit'])) {
     $edit_post = mysqli_fetch_assoc($res);
 }
 
+/** EDIT AUTHOR CONTEXT FETCH */
+$edit_author_ctx = null;
+if (isset($_GET['edit_author'])) {
+    $id = (int)$_GET['edit_author'];
+    $res = mysqli_query($conn, "SELECT * FROM authors WHERE author_id=$id");
+    $edit_author_ctx = mysqli_fetch_assoc($res);
+}
+
 /** INSPECT/VIEW POST ENGINE LOOP */
 $view_post = null;
 if (isset($_GET['view'])) {
@@ -123,11 +169,9 @@ if (isset($_POST['update_post'])) {
     $author_id = (int)$_POST['author_id'];
     $is_popular = isset($_POST['is_popular']) ? 1 : 0;
 
-    // Process new file input binaries
     $new_cover = process_image_upload($_FILES['cover_image_file']);
     $new_avatar = process_image_upload($_FILES['post_author_avatar_file']);
 
-    // Base fallback selection mapping
     $cover_condition_update = $new_cover ? "cover_image='$new_cover'," : "";
 
     mysqli_query($conn,
@@ -156,14 +200,15 @@ $posts = mysqli_query($conn,
      ORDER BY post_id DESC"
 );
 
-$authors_query = mysqli_query($conn, "SELECT * FROM authors");
+$authors_query = mysqli_query($conn, "SELECT * FROM authors ORDER BY author_id DESC");
 $authors = [];
 while ($auth_row = mysqli_fetch_assoc($authors_query)) {
     $authors[] = $auth_row;
 }
 
-// Store total rows to compute dynamic visual serials down standard iterations
 $total_rows = mysqli_num_rows($posts);
+$is_overlay_active = ($view_post || $edit_post || $edit_author_ctx || isset($_GET['action_mode'])) ? 'true' : 'false';
+$dismiss_target_url = (isset($_GET['action_mode']) && $_GET['action_mode'] === 'author' || $edit_author_ctx) ? 'dashboard.php?action_mode=authors_panel' : 'dashboard.php';
 ?>
 
 <!DOCTYPE html>
@@ -176,9 +221,9 @@ $total_rows = mysqli_num_rows($posts);
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
-<body class="dashboard-body">
+<body class="dashboard-body" id="dashboardViewportBackdrop">
 
-<div class="dashboard-container">
+<div class="dashboard-container" id="dashboardContentMatrix">
 
     <div class="dashboard-header">
         <div class="panel-identity">
@@ -234,34 +279,44 @@ $total_rows = mysqli_num_rows($posts);
         </div>
     <?php } ?>
 
-    <?php if ($edit_post || isset($_GET['action_mode'])) { ?>
+    <?php 
+    if ($edit_post || $edit_author_ctx || (isset($_GET['action_mode']) && ($_GET['action_mode'] === 'author' || $_GET['action_mode'] === 'create'))) { 
+    ?>
         
-        <?php if (isset($_GET['action_mode']) && $_GET['action_mode'] === 'author') { ?>
+        <?php if ((isset($_GET['action_mode']) && $_GET['action_mode'] === 'author') || $edit_author_ctx) { ?>
             <div class="form-card action-focus-card">
                 <div class="form-card-header">
                     <h3>
-                        <i class="fa-solid fa-user-plus text-blue-icon"></i> Introduce New Verified Platform Author
+                        <i class="fa-solid <?php echo $edit_author_ctx ? 'fa-user-pen' : 'fa-user-plus'; ?> text-blue-icon"></i> 
+                        <?php echo $edit_author_ctx ? "Modify Existing Author Properties" : "Introduce New Verified Platform Author"; ?>
                     </h3>
-                    <a href="dashboard.php" class="close-workspace-btn"><i class="fa-solid fa-xmark"></i></a>
+                    <a href="dashboard.php?action_mode=authors_panel" class="close-workspace-btn"><i class="fa-solid fa-xmark"></i></a>
                 </div>
                 <form method="POST" enctype="multipart/form-data">
+                    <?php if ($edit_author_ctx) { ?>
+                        <input type="hidden" name="author_id" value="<?php echo $edit_author_ctx['author_id']; ?>">
+                    <?php } ?>
                     <div class="form-input-grid">
                         <div class="input-group">
-                            <label>Author Display Name</label>
-                            <input type="text" name="author_name" placeholder="e.g., Sarah Jenkins" required>
+                            <label>Author Name</label>
+                            <input type="text" name="author_name" placeholder="e.g., Sarah Jenkins" value="<?php echo htmlspecialchars($edit_author_ctx['author_name'] ?? ''); ?>" required>
                         </div>
                         <div class="input-group">
-                            <label>Author Avatar Picture Upload</label>
-                            <input type="file" name="author_avatar_file" accept="image/*" required>
+                            <label>Author Avatar Picture Upload <?php echo $edit_author_ctx ? '(Optional Edit)' : ''; ?></label>
+                            <input type="file" name="author_avatar_file" accept="image/*" <?php echo $edit_author_ctx ? '' : 'required'; ?>>
                         </div>
                     </div>
                     <div class="form-button-cluster">
-                        <button type="submit" name="add_author" class="submit-action-btn"><i class="fa-solid fa-user-check"></i> Register New Author</button>
-                        <a href="dashboard.php" class="cancel-action-btn">Cancel Workspace</a>
+                        <?php if ($edit_author_ctx) { ?>
+                            <button type="submit" name="update_author" class="submit-action-btn"><i class="fa-solid fa-user-check"></i> Save Author Changes</button>
+                        <?php } else { ?>
+                            <button type="submit" name="add_author" class="submit-action-btn"><i class="fa-solid fa-user-check"></i> Register New Author</button>
+                        <?php } ?>
+                        <a href="dashboard.php?action_mode=authors_panel" class="cancel-action-btn"><i class="fa-solid fa-times"></i> Cancel Workspace</a>
                     </div>
                 </form>
             </div>
-        <?php } else { ?>
+        <?php } elseif ($edit_post || (isset($_GET['action_mode']) && $_GET['action_mode'] === 'create')) { ?>
             <div class="form-card action-focus-card">
                 <div class="form-card-header">
                     <h3>
@@ -291,7 +346,7 @@ $total_rows = mysqli_num_rows($posts);
                         <div class="input-group">
                             <label>Assigned Author</label>
                             <select name="author_id" required>
-                                <option value="">Map structural author token...</option>
+                                <option value="">Author List</option>
                                 <?php foreach ($authors as $a) { ?>
                                     <option value="<?php echo $a['author_id']; ?>"
                                         <?php if ($edit_post && $edit_post['author_id'] == $a['author_id']) echo "selected"; ?>>
@@ -336,98 +391,191 @@ $total_rows = mysqli_num_rows($posts);
     <?php } ?>
 
     <?php if (!isset($_GET['view'])) { ?>
-        <div class="posts-card">
-            <div class="table-header-action-row">
-                <div class="table-title-area">
-                    <h3><i class="fa-solid fa-database text-blue-icon"></i> Content Management</h3>
-                    <p class="row-count-tracker">Showing <?php echo $total_rows; ?> posts</p>
-                </div>
-                <div style="display: flex; gap: 12px;">
-                    <?php if (!isset($_GET['action_mode']) && !$edit_post) { ?>
+        
+        <?php if (isset($_GET['action_mode']) && $_GET['action_mode'] === 'authors_panel') { ?>
+            <div class="posts-card">
+                <div class="table-header-action-row">
+                    <div class="table-title-area">
+                        <h3><i class="fa-solid fa-users text-blue-icon"></i> Author Management Panel</h3>
+                        <p class="row-count-tracker">Review active system content creators</p>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <a href="dashboard.php" class="initialize-creation-btn" style="background: rgba(96, 165, 250, 0.1); color: var(--accent-blue); border-color: rgba(96, 165, 250, 0.25);">
+                            <i class="fa-solid fa-arrow-left"></i> Back
+                        </a>
                         <a href="dashboard.php?action_mode=author" class="initialize-creation-btn" style="background: rgba(167, 139, 250, 0.1); color: var(--accent-purple); border-color: rgba(167, 139, 250, 0.25);">
-                            <i class="fa-solid fa-user-plus"></i> Add New Author
+                            <i class="fa-solid fa-user-plus"></i> Register New Author
+                        </a>
+                    </div>
+                </div>
+
+                <div class="table-responsive-wrapper">
+                    <table class="dashboard-data-table">
+                        <thead>
+                            <tr>
+                                <th width="15%">Author ID</th>
+                                <th width="45%">Author Identity</th>
+                                <th width="25%">Avatar Image Asset</th>
+                                <th width="15%" style="text-align: right; padding-right: 25px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (count($authors) > 0) { 
+                                foreach ($authors as $auth) {
+                            ?>
+                                    <tr class="table-data-row">
+                                        <td class="record-id-badge">#AUTH-<?php echo $auth['author_id']; ?></td>
+                                        <td><span class="table-row-title"><?php echo htmlspecialchars($auth['author_name']); ?></span></td>
+                                        <td>
+                                            <div class="table-image-preview-node">
+                                                <div class="mini-thumbnail-frame" style="border-radius: 50%; width: 38px;">
+                                                    <img src="../<?php echo htmlspecialchars($auth['avatar_url']); ?>" alt="Avatar" onerror="this.src='https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80'">
+                                                </div>
+                                                <span class="image-file-string"><?php echo htmlspecialchars($auth['avatar_url']); ?></span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right; padding-right: 20px;">
+                                            <div class="operation-icon-actions-cluster">
+                                                <a href="dashboard.php?edit_author=<?php echo $auth['author_id']; ?>" class="op-btn modify-view" title="Edit Properties">
+                                                    <i class="fa-solid fa-pencil"></i>
+                                                </a>
+                                                <a href="dashboard.php?delete_author=<?php echo $auth['author_id']; ?>" 
+                                                   onclick="return confirm('Purge this author record permanently from table databases? Note: Authors linked to blog posts cannot be deleted.')" class="op-btn drop-view" title="Purge Record">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                            <?php 
+                                } 
+                            } else { ?>
+                                <tr>
+                                    <td colspan="4">
+                                        <div class="empty-dashboard-state">
+                                            <i class="fa-solid fa-users-slash empty-ghost-icon"></i>
+                                            <p>No verified writers located in database table.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        
+        <?php } elseif (!isset($_GET['edit_author']) && !isset($_GET['edit']) && (!isset($_GET['action_mode']) || $_GET['action_mode'] === 'authors_panel')) { ?>
+            
+            <div class="posts-card">
+                <div class="table-header-action-row">
+                    <div class="table-title-area">
+                        <h3><i class="fa-solid fa-database text-blue-icon"></i> Content Management</h3>
+                        <p class="row-count-tracker">Showing <?php echo $total_rows; ?> posts</p>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <a href="dashboard.php?action_mode=authors_panel" class="initialize-creation-btn" style="background: rgba(167, 139, 250, 0.1); color: var(--accent-purple); border-color: rgba(167, 139, 250, 0.25);">
+                            <i class="fa-solid fa-users-gear"></i> Author Management
                         </a>
                         <a href="dashboard.php?action_mode=create" class="initialize-creation-btn">
                             <i class="fa-solid fa-plus-circle"></i> Add New Post
                         </a>
-                    <?php } ?>
+                    </div>
                 </div>
-            </div>
 
-            <div class="table-responsive-wrapper">
-                <table class="dashboard-data-table">
-                    <thead>
-                        <tr>
-                            <th width="10%">Post No</th>
-                            <th width="35%">Post Title</th>
-                            <th width="22%">Cover Image</th>
-                            <th width="13%">Status</th>
-                            <th width="20%" style="text-align: right; padding-right: 25px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if ($total_rows > 0) { 
-                            $serial_num = $total_rows;
-                            while ($p = mysqli_fetch_assoc($posts)) { 
-                        ?>
-                                <tr class="table-data-row">
-                                    <td class="record-id-badge">#<?php echo $serial_num; ?></td>
-                                    <td>
-                                        <div class="identity-meta-container">
-                                            <span class="table-row-title"><?php echo htmlspecialchars($p['title']); ?></span>
-                                            <span class="table-row-subtext"><i class="fa-solid fa-feather-pointed"></i> <?php echo htmlspecialchars($p['author_name']); ?></span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="table-image-preview-node">
-                                            <div class="mini-thumbnail-frame">
-                                                <img src="../<?php echo htmlspecialchars($p['cover_image']); ?>" alt="Cover Stream" onerror="this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=80&q=80'">
+                <div class="table-responsive-wrapper">
+                    <table class="dashboard-data-table">
+                        <thead>
+                            <tr>
+                                <th width="10%">Post No</th>
+                                <th width="35%">Post Title</th>
+                                <th width="22%">Cover Image</th>
+                                <th width="13%">Status</th>
+                                <th width="20%" style="text-align: right; padding-right: 25px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($total_rows > 0) { 
+                                $serial_num = $total_rows;
+                                while ($p = mysqli_fetch_assoc($posts)) { 
+                            ?>
+                                    <tr class="table-data-row">
+                                        <td class="record-id-badge">#<?php echo $serial_num; ?></td>
+                                        <td>
+                                            <div class="identity-meta-container">
+                                                <span class="table-row-title"><?php echo htmlspecialchars($p['title']); ?></span>
+                                                <span class="table-row-subtext"><i class="fa-solid fa-feather-pointed"></i> <?php echo htmlspecialchars($p['author_name']); ?></span>
                                             </div>
-                                            <span class="image-file-string"><?php echo htmlspecialchars($p['cover_image']); ?></span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <?php if ($p['is_popular']) { ?>
-                                            <span class="popular-status-pill"><i class="fa-solid fa-fire-flame-curved"></i> Popular</span>
-                                        <?php } else { ?>
-                                            <span class="standard-dash-pill">—</span>
-                                        <?php } ?>
-                                    </td>
-                                    <td style="text-align: right; padding-right: 20px;">
-                                        <div class="operation-icon-actions-cluster">
-                                            <a href="dashboard.php?view=<?php echo $p['post_id']; ?>" class="op-btn read-view" title="Inspect Live View">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </a>
-                                            <a href="dashboard.php?edit=<?php echo $p['post_id']; ?>" class="op-btn modify-view" title="Edit Properties">
-                                                <i class="fa-solid fa-pencil"></i>
-                                            </a>
-                                            <a href="dashboard.php?delete=<?php echo $p['post_id']; ?>" 
-                                               onclick="return confirm('Drop records permanently from this table row?')" class="op-btn drop-view" title="Purge Record">
-                                                <i class="fa-solid fa-trash-can"></i>
-                                            </a>
+                                        </td>
+                                        <td>
+                                            <div class="table-image-preview-node">
+                                                <div class="mini-thumbnail-frame">
+                                                    <img src="../<?php echo htmlspecialchars($p['cover_image']); ?>" alt="Cover Stream" onerror="this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=80&q=80'">
+                                                </div>
+                                                <span class="image-file-string"><?php echo htmlspecialchars($p['cover_image']); ?></span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <?php if ($p['is_popular']) { ?>
+                                                <span class="popular-status-pill"><i class="fa-solid fa-fire-flame-curved"></i> Popular</span>
+                                            <?php } else { ?>
+                                                <span class="standard-dash-pill">—</span>
+                                            <?php } ?>
+                                        </td>
+                                        <td style="text-align: right; padding-right: 20px;">
+                                            <div class="operation-icon-actions-cluster">
+                                                <a href="dashboard.php?view=<?php echo $p['post_id']; ?>" class="op-btn read-view" title="Inspect Live View">
+                                                    <i class="fa-solid fa-eye"></i>
+                                                </a>
+                                                <a href="dashboard.php?edit=<?php echo $p['post_id']; ?>" class="op-btn modify-view" title="Edit Properties">
+                                                    <i class="fa-solid fa-pencil"></i>
+                                                </a>
+                                                <a href="dashboard.php?delete=<?php echo $p['post_id']; ?>" 
+                                                   onclick="return confirm('Drop records permanently from this table row?')" class="op-btn drop-view" title="Purge Record">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php 
+                                    $serial_num--;
+                                } 
+                            } else { ?>
+                                <tr>
+                                    <td colspan="5">
+                                        <div class="empty-dashboard-state">
+                                            <i class="fa-solid fa-box-open empty-ghost-icon"></i>
+                                            <p>Database structure holds no matching entry points.</p>
                                         </div>
                                     </td>
                                 </tr>
-                            <?php 
-                                $serial_num--;
-                            } 
-                        } else { ?>
-                            <tr>
-                                <td colspan="5">
-                                    <div class="empty-dashboard-state">
-                                        <i class="fa-solid fa-box-open empty-ghost-icon"></i>
-                                        <p>Database structure holds no matching entry points.</p>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php } ?>
-                    </tbody>
-                </table>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        <?php } ?>
     <?php } ?>
 
 </div>
+
+<script type="text/javascript">
+document.addEventListener("DOMContentLoaded", function() {
+    const overlayConditionActive = <?php echo $is_overlay_active; ?>;
+    
+    if (overlayConditionActive) {
+        const viewportBackdrop = document.getElementById("dashboardViewportBackdrop");
+        const contentMatrix = document.getElementById("dashboardContentMatrix");
+        
+        viewportBackdrop.style.cursor = "pointer";
+        
+        viewportBackdrop.addEventListener("click", function(event) {
+            const isClickInsideCard = contentMatrix.contains(event.target);
+            if (!isClickInsideCard) {
+                window.location.href = "<?php echo $dismiss_target_url; ?>";
+            }
+        });
+    }
+});
+</script>
 
 </body>
 </html>
