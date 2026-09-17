@@ -159,7 +159,7 @@ $edit_post = null;
 if (isset($_GET['edit'])) {
     $id = (int)$_GET['edit'];
     $res = mysqli_query($conn, "
-        SELECT blog_posts.*, authors.avatar_url 
+        SELECT blog_posts.*, authors.avatar_url, authors.author_name 
         FROM blog_posts 
         JOIN authors ON blog_posts.author_id = authors.author_id 
         WHERE post_id=$id
@@ -220,12 +220,25 @@ if (isset($_POST['update_post'])) {
 }
 
 /** DATA QUERIES */
-$posts = mysqli_query($conn,
-    "SELECT blog_posts.*, authors.author_name 
+$search_q = isset($_GET['q']) ? trim($_GET['q']) : '';
+$posts_sql = "SELECT blog_posts.*, authors.author_name, authors.avatar_url
      FROM blog_posts 
-     JOIN authors ON blog_posts.author_id = authors.author_id 
-     ORDER BY post_id DESC"
-);
+     JOIN authors ON blog_posts.author_id = authors.author_id";
+if ($search_q !== '') {
+    $sq = mysqli_real_escape_string($conn, $search_q);
+    $posts_sql .= " WHERE (blog_posts.title LIKE '%$sq%' OR authors.author_name LIKE '%$sq%')";
+}
+$posts_sql .= " ORDER BY post_id DESC";
+$posts = mysqli_query($conn, $posts_sql);
+
+/* Analytics */
+$stat_total = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM blog_posts"))['c'] ?? 0);
+$stat_pub = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM blog_posts WHERE status='published'"))['c'] ?? 0);
+$stat_pending = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM blog_posts WHERE status='pending'"))['c'] ?? 0);
+$stat_views = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COALESCE(SUM(view_count),0) AS c FROM blog_posts"))['c'] ?? 0);
+$stat_authors = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM authors"))['c'] ?? 0);
+$stat_pending_authors = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM authors WHERE status='pending'"))['c'] ?? 0);
+
 
 $authors_query = mysqli_query($conn, "SELECT * FROM authors ORDER BY author_id DESC");
 $authors = [];
@@ -241,8 +254,17 @@ while ($set_row = mysqli_fetch_assoc($settings_query)) {
 }
 
 $total_rows = mysqli_num_rows($posts);
-$is_overlay_active = ($view_post || $edit_post || $edit_author_ctx || (isset($_GET['action_mode']) && $_GET['action_mode'] !== 'settings')) ? 'true' : 'false';
-$dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 'author' || $edit_author_ctx)) ? 'dashboard.php?action_mode=authors_panel' : 'dashboard.php';
+/* Backdrop dismiss only for true overlays (create/edit/view forms) — NOT authors_panel list */
+$overlay_modes = ['create', 'author'];
+$is_overlay_active = (
+    $view_post
+    || $edit_post
+    || $edit_author_ctx
+    || (isset($_GET['action_mode']) && in_array($_GET['action_mode'], $overlay_modes, true))
+) ? 'true' : 'false';
+$dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 'author' || $edit_author_ctx))
+    ? 'dashboard.php?action_mode=authors_panel'
+    : 'dashboard.php';
 ?>
 
 <!DOCTYPE html>
@@ -250,7 +272,8 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+    <title>Admin Dashboard · TechSpace</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <link rel="stylesheet" href="admin.css">
     <link rel="stylesheet" href="../style.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -269,14 +292,54 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
             </div>
         </div>
         <div class="header-nav-actions">
+            <a href="dashboard.php?action_mode=settings" class="header-tool-btn header-tool-settings" title="Site Settings">
+                <i class="fa-solid fa-sliders"></i> <span>Settings</span>
+            </a>
+            <a href="dashboard.php?action_mode=authors_panel" class="header-tool-btn header-tool-authors" title="Author Management">
+                <i class="fa-solid fa-users-gear"></i> <span>Authors</span>
+            </a>
             <a href="../index.php" class="live-site-link">
-                <i class="fa-solid fa-circle-nodes"></i> View Live Site
+                <i class="fa-solid fa-circle-nodes"></i> <span>Live Site</span>
             </a>
             <a class="logout-btn" href="dashboard.php?logout=1">
-                <i class="fa-solid fa-power-off"></i> Logout
+                <i class="fa-solid fa-power-off"></i> <span>Logout</span>
             </a>
         </div>
     </div>
+
+    <!-- Analytics -->
+    <div class="analytics-strip">
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="fa-solid fa-newspaper"></i></div>
+            <div class="stat-meta">
+                <div class="stat-value"><?php echo $stat_total; ?></div>
+                <div class="stat-label">Total Posts</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="stat-meta">
+                <div class="stat-value"><?php echo $stat_pub; ?></div>
+                <div class="stat-label">Published</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon amber"><i class="fa-solid fa-clock"></i></div>
+            <div class="stat-meta">
+                <div class="stat-value"><?php echo $stat_pending; ?></div>
+                <div class="stat-label">Pending Review</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon purple"><i class="fa-solid fa-eye"></i></div>
+            <div class="stat-meta">
+                <div class="stat-value"><?php echo number_format($stat_views); ?></div>
+                <div class="stat-label">Total Views</div>
+            </div>
+        </div>
+    </div>
+
+
 
     <?php if ($view_post) { ?>
         <div class="inspect-view-card">
@@ -447,7 +510,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                 <div class="form-card-header">
                     <h3>
                         <i class="fa-solid <?php echo $edit_post ? 'fa-square-pen' : 'fa-folder-plus'; ?>"></i>
-                        <?php echo $edit_post ? "Modify Node Block: ID #" . $edit_post['post_id'] : "Initialize New Blog Entry Node"; ?>
+                        <?php echo $edit_post ? "Edit Article" : "Create New Article"; ?>
                     </h3>
                     <a href="dashboard.php" class="close-workspace-btn"><i class="fa-solid fa-xmark"></i></a>
                 </div>
@@ -509,16 +572,39 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
 
                 <div class="live-sandbox-preview-frame">
                     <div class="sandbox-overlay-badge"><i class="fa-solid fa-wand-magic-sparkles"></i> Active Sandbox Live Preview Canvas</div>
-                    <div class="live-post-preview-card">
-                        <img class="preview-cover" id="admin_live_cover"
-                            src="<?php echo $edit_post ? '../' . htmlspecialchars($edit_post['cover_image']) : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'; ?>"
-                            alt="Cover preview"
-                            onerror="this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'">
-                        <div class="preview-body">
-                            <div class="preview-title" id="admin_live_title"><?php echo htmlspecialchars($edit_post['title'] ?? 'Your title appears here'); ?></div>
-                            <div class="preview-excerpt" id="admin_live_excerpt"><?php
-                                $ex = $edit_post['content'] ?? 'Your article excerpt will show here as you type...';
-                                echo htmlspecialchars(mb_substr($ex, 0, 180)) . (mb_strlen($ex) > 180 ? '...' : '');
+                    <div class="live-blog-preview-card">
+                        <div class="cover-wrapper">
+                            <img id="admin_live_cover"
+                                src="<?php echo $edit_post ? '../' . htmlspecialchars($edit_post['cover_image']) : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'; ?>"
+                                alt="Cover preview"
+                                onerror="this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'">
+                        </div>
+                        <div class="blog-content">
+                            <div class="author-row">
+                                <div class="author-left">
+                                    <img id="admin_live_avatar" src="<?php
+                                        $av = 'avatar1.png';
+                                        if ($edit_post && !empty($edit_post['avatar_url'])) $av = $edit_post['avatar_url'];
+                                        echo '../' . htmlspecialchars($av);
+                                    ?>" alt="Author" onerror="this.src='https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80'">
+                                    <div>
+                                        <h4 id="admin_live_author"><?php
+                                            $an = 'Author';
+                                            if ($edit_post && !empty($edit_post['author_name'])) $an = $edit_post['author_name'];
+                                            elseif ($edit_post && !empty($edit_post['author_id'])) {
+                                                foreach ($authors as $ax) { if ($ax['author_id'] == $edit_post['author_id']) { $an = $ax['author_name']; break; } }
+                                            }
+                                            echo htmlspecialchars($an);
+                                        ?></h4>
+                                        <p class="date" id="admin_live_date"><?php echo $edit_post ? date('M d, Y', strtotime($edit_post['published_date'] ?? 'now')) : date('M d, Y'); ?></p>
+                                    </div>
+                                </div>
+                                <div class="views-chip"><i class="fa-solid fa-eye"></i> <span id="admin_live_views"><?php echo $edit_post ? number_format((int)($edit_post['view_count'] ?? 0)) : '0'; ?></span> views</div>
+                            </div>
+                            <h2 class="preview-title" id="admin_live_title"><?php echo htmlspecialchars($edit_post['title'] ?? 'Your title appears here'); ?></h2>
+                            <div class="preview-body-text" id="admin_live_excerpt"><?php
+                                $ex = $edit_post['content'] ?? 'Your full article content will appear here as you type — matching the public article view.';
+                                echo nl2br(htmlspecialchars($ex));
                             ?></div>
                         </div>
                     </div>
@@ -561,10 +647,11 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                         </thead>
                         <tbody>
                             <?php if (count($authors) > 0) { 
+                                $auth_serial = count($authors);
                                 foreach ($authors as $auth) {
                             ?>
                                                                         <tr class="table-data-row">
-                                        <td class="record-id-badge">#AUTH-<?php echo $auth['author_id']; ?></td>
+                                        <td class="record-id-badge">#<?php echo $auth_serial; ?></td>
                                         <td><span class="table-row-title"><?php echo htmlspecialchars($auth['author_name']); ?></span></td>
                                         <td><span style="font-size:12px;color:var(--text-secondary);"><?php echo htmlspecialchars($auth['email'] ?? '—'); ?></span></td>
                                         <td><?php
@@ -599,6 +686,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                                         </td>
                                     </tr>
                             <?php 
+                                $auth_serial--;
                                 } 
                             } else { ?>
                                 <tr>
@@ -623,13 +711,11 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                         <h3><i class="fa-solid fa-database text-blue-icon" style="padding-right: 5px;"></i> Content Management</h3>
                         <p class="row-count-tracker" style="padding-top: 5px; margin: 0; padding-left: 30px;">Showing <?php echo $total_rows; ?> posts</p>
                     </div>
-                    <div style="display: flex; gap: 12px;">
-                        <a href="dashboard.php?action_mode=settings" class="initialize-creation-btn" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; border-color: rgba(56, 189, 248, 0.25);">
-                            <i class="fa-solid fa-sliders-up"></i> Site Settings Panel
-                        </a>
-                        <a href="dashboard.php?action_mode=authors_panel" class="initialize-creation-btn" style="background: rgba(167, 139, 250, 0.1); color: var(--accent-purple); border-color: rgba(167, 139, 250, 0.25);">
-                            <i class="fa-solid fa-users-gear"></i> Author Management
-                        </a>
+                    <div class="content-mgmt-actions">
+                        <form method="GET" action="dashboard.php" class="portal-search-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" name="q" placeholder="Search title or author..." value="<?php echo htmlspecialchars($search_q); ?>">
+                        </form>
                         <a href="dashboard.php?action_mode=create" class="initialize-creation-btn">
                             <i class="fa-solid fa-plus-circle"></i> Add New Post
                         </a>
@@ -726,6 +812,16 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
         <?php } ?>
     <?php } ?>
 
+
+    <footer class="portal-footer">
+        <p class="copyright">&copy; 2026 &nbsp <span class="text-glow">TechSpace</span> · Admin Panel</p>
+        <div class="social-links">
+            <a href="https://www.facebook.com" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+            <a href="https://twitter.com" title="Twitter"><i class="fab fa-x-twitter"></i></a>
+            <a href="https://www.linkedin.com/in/naima-rahman-176196308/" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+        </div>
+    </footer>
+
 </div>
 
 <script type="text/javascript">
@@ -742,8 +838,12 @@ document.addEventListener("DOMContentLoaded", function() {
             const insideWorkspaceForm = event.target.closest('.form-card');
             const insideInspectViewCard = event.target.closest('.inspect-view-card');
             const insideHeader = event.target.closest('.dashboard-header');
+            const insidePostsCard = event.target.closest('.posts-card');
+            const insideAnalytics = event.target.closest('.analytics-strip');
+            const insideFooter = event.target.closest('.portal-footer');
             
-            if (!insideWorkspaceForm && !insideInspectViewCard && !insideHeader) {
+            if (!insideWorkspaceForm && !insideInspectViewCard && !insideHeader
+                && !insidePostsCard && !insideAnalytics && !insideFooter) {
                 window.location.href = "<?php echo $dismiss_target_url; ?>";
             }
         });
@@ -773,22 +873,24 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // --- Post editor live preview ---
+    // --- Post editor live preview (full article card) ---
     (function () {
         var titleIn = document.getElementById('admin_post_title');
         var contentIn = document.getElementById('admin_post_content');
         var coverIn = document.getElementById('admin_post_cover');
+        var authorSel = document.querySelector('select[name="author_id"]');
         var liveTitle = document.getElementById('admin_live_title');
         var liveExcerpt = document.getElementById('admin_live_excerpt');
         var liveCover = document.getElementById('admin_live_cover');
+        var liveAuthor = document.getElementById('admin_live_author');
         if (!titleIn || !liveTitle) return;
         titleIn.addEventListener('input', function () {
             liveTitle.textContent = this.value || 'Your title appears here';
         });
         if (contentIn && liveExcerpt) {
             contentIn.addEventListener('input', function () {
-                var t = this.value || 'Your article excerpt will show here as you type...';
-                liveExcerpt.textContent = t.length > 180 ? t.substring(0, 180) + '...' : t;
+                var t = this.value || 'Your full article content will appear here as you type — matching the public article view.';
+                liveExcerpt.innerText = t;
             });
         }
         if (coverIn && liveCover) {
@@ -798,6 +900,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     reader.onload = function (e) { liveCover.src = e.target.result; };
                     reader.readAsDataURL(this.files[0]);
                 }
+            });
+        }
+        if (authorSel && liveAuthor) {
+            authorSel.addEventListener('change', function () {
+                var opt = this.options[this.selectedIndex];
+                liveAuthor.textContent = opt ? opt.text.replace(/\s*\(pending\)\s*$/, '') : 'Author';
             });
         }
     })();

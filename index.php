@@ -117,6 +117,7 @@ $archives = mysqli_query(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TechSpace</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -144,14 +145,15 @@ $archives = mysqli_query(
             <li><a href="index.php?page=contact" class="<?php echo ($page === 'contact') ? 'active' : ''; ?>"><i class="fa-solid rel-icon fa-envelope"></i> Contact</a></li>
         </ul>
         <div class="nav-right-cluster">
-            <form method="GET" action="index.php">
+            <form method="GET" action="index.php" class="nav-search-form">
                 <div class="search-box">
                     <input
                         type="text"
                         name="search"
-                        placeholder="Search premium articles..."
-                        value="<?php echo htmlspecialchars($search); ?>">
-                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        placeholder="Search..."
+                        value="<?php echo htmlspecialchars($search); ?>"
+                        aria-label="Search articles">
+                    <i class="fa-solid fa-magnifying-glass search-icon" aria-hidden="true"></i>
                 </div>
             </form>
             <div class="nav-auth-actions">
@@ -543,6 +545,7 @@ $archives = mysqli_query(
         }
     });
     </script>
+
 
 
 </body>
