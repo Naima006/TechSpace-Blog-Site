@@ -48,6 +48,29 @@ if (isset($_GET['delete_author'])) {
     exit();
 }
 
+
+/** APPROVE / REJECT AUTHOR */
+if (isset($_GET['approve_author'])) {
+    $auth_id = (int)$_GET['approve_author'];
+    mysqli_query($conn, "UPDATE authors SET status='approved' WHERE author_id=$auth_id");
+    header("Location: dashboard.php?action_mode=authors_panel");
+    exit();
+}
+if (isset($_GET['reject_author'])) {
+    $auth_id = (int)$_GET['reject_author'];
+    mysqli_query($conn, "UPDATE authors SET status='rejected' WHERE author_id=$auth_id");
+    header("Location: dashboard.php?action_mode=authors_panel");
+    exit();
+}
+
+/** PUBLISH PENDING POST */
+if (isset($_GET['publish_post'])) {
+    $id = (int)$_GET['publish_post'];
+    mysqli_query($conn, "UPDATE blog_posts SET status='published' WHERE post_id=$id");
+    header("Location: dashboard.php");
+    exit();
+}
+
 /** HELPER FUNCTION FOR LOCAL FILE UPLOADS */
 function process_image_upload($file_array) {
     if (isset($file_array) && $file_array['error'] === UPLOAD_ERR_OK) {
@@ -72,7 +95,7 @@ if (isset($_POST['add_author'])) {
     if (!$auth_avatar) { $auth_avatar = 'avatar1.png'; }
     
     if (!empty($auth_name)) {
-        mysqli_query($conn, "INSERT INTO authors (author_name, avatar_url) VALUES ('$auth_name', '$auth_avatar')");
+        mysqli_query($conn, "INSERT INTO authors (author_name, avatar_url, status) VALUES ('$auth_name', '$auth_avatar', 'approved')");
     }
     header("Location: dashboard.php?action_mode=authors_panel");
     exit();
@@ -118,9 +141,9 @@ if (isset($_POST['add_post'])) {
 
     mysqli_query($conn,
         "INSERT INTO blog_posts 
-        (title, cover_image, content, author_id, is_popular) 
+        (title, cover_image, content, author_id, is_popular, status) 
         VALUES 
-        ('$title','$cover','$content',$author_id,$is_popular)"
+        ('$title','$cover','$content',$author_id,$is_popular,'published')"
     );
 
     if ($post_avatar) {
@@ -429,6 +452,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                     <a href="dashboard.php" class="close-workspace-btn"><i class="fa-solid fa-xmark"></i></a>
                 </div>
 
+                <div class="post-preview-workspace">
                 <form method="POST" enctype="multipart/form-data">
                     <?php if ($edit_post) { ?>
                         <input type="hidden" name="post_id" value="<?php echo $edit_post['post_id']; ?>">
@@ -437,23 +461,25 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                     <div class="form-input-grid">
                         <div class="input-group">
                             <label>Blog Post Title</label>
-                            <input type="text" name="title" placeholder="Define database title record..."
+                            <input type="text" name="title" id="admin_post_title" placeholder="Define database title record..."
                                 value="<?php echo htmlspecialchars($edit_post['title'] ?? ''); ?>" required>
                         </div>
 
                         <div class="input-group">
                             <label>Cover Image Upload <?php echo $edit_post ? '(Leave blank to retain current)' : ''; ?></label>
-                            <input type="file" name="cover_image_file" accept="image/*" <?php echo $edit_post ? '' : 'required'; ?>>
+                            <input type="file" name="cover_image_file" id="admin_post_cover" accept="image/*" <?php echo $edit_post ? '' : 'required'; ?>>
                         </div>
 
                         <div class="input-group">
                             <label>Assigned Author</label>
                             <select name="author_id" required>
                                 <option value="">Author List</option>
-                                <?php foreach ($authors as $a) { ?>
+                                <?php foreach ($authors as $a) {
+                                    if (($a['status'] ?? 'approved') === 'rejected') continue;
+                                ?>
                                     <option value="<?php echo $a['author_id']; ?>"
                                         <?php if ($edit_post && $edit_post['author_id'] == $a['author_id']) echo "selected"; ?>>
-                                        <?php echo htmlspecialchars($a['author_name']); ?>
+                                        <?php echo htmlspecialchars($a['author_name']); ?><?php echo (($a['status'] ?? '') === 'pending') ? ' (pending)' : ''; ?>
                                     </option>
                                 <?php } ?>
                             </select>
@@ -468,7 +494,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
 
                     <div class="input-group" style="margin-top: 15px;">
                         <label>Content Body</label>
-                        <textarea name="content" placeholder="Compile text array elements here..." required><?php echo htmlspecialchars($edit_post['content'] ?? ''); ?></textarea>
+                        <textarea name="content" id="admin_post_content" placeholder="Compile text array elements here..." required><?php echo htmlspecialchars($edit_post['content'] ?? ''); ?></textarea>
                     </div>
 
                     <div class="form-button-cluster">
@@ -480,6 +506,24 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                         <a href="dashboard.php" class="cancel-action-btn"><i class="fa-solid fa-times"></i> Cancel Workspace</a>
                     </div>
                 </form>
+
+                <div class="live-sandbox-preview-frame">
+                    <div class="sandbox-overlay-badge"><i class="fa-solid fa-wand-magic-sparkles"></i> Active Sandbox Live Preview Canvas</div>
+                    <div class="live-post-preview-card">
+                        <img class="preview-cover" id="admin_live_cover"
+                            src="<?php echo $edit_post ? '../' . htmlspecialchars($edit_post['cover_image']) : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'; ?>"
+                            alt="Cover preview"
+                            onerror="this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'">
+                        <div class="preview-body">
+                            <div class="preview-title" id="admin_live_title"><?php echo htmlspecialchars($edit_post['title'] ?? 'Your title appears here'); ?></div>
+                            <div class="preview-excerpt" id="admin_live_excerpt"><?php
+                                $ex = $edit_post['content'] ?? 'Your article excerpt will show here as you type...';
+                                echo htmlspecialchars(mb_substr($ex, 0, 180)) . (mb_strlen($ex) > 180 ? '...' : '');
+                            ?></div>
+                        </div>
+                    </div>
+                </div>
+                </div>
             </div>
         <?php } ?>
     <?php } ?>
@@ -507,33 +551,47 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                     <table class="dashboard-data-table">
                         <thead>
                             <tr>
-                                <th width="15%">Author ID</th>
-                                <th width="45%">Author Identity</th>
-                                <th width="25%">Avatar Image Asset</th>
-                                <th width="15%" style="text-align: right; padding-right: 25px;">Actions</th>
+                                <th width="12%">Author ID</th>
+                                <th width="28%">Author Identity</th>
+                                <th width="18%">Email</th>
+                                <th width="14%">Status</th>
+                                <th width="14%">Avatar</th>
+                                <th width="14%" style="text-align: right; padding-right: 25px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (count($authors) > 0) { 
                                 foreach ($authors as $auth) {
                             ?>
-                                    <tr class="table-data-row">
+                                                                        <tr class="table-data-row">
                                         <td class="record-id-badge">#AUTH-<?php echo $auth['author_id']; ?></td>
                                         <td><span class="table-row-title"><?php echo htmlspecialchars($auth['author_name']); ?></span></td>
+                                        <td><span style="font-size:12px;color:var(--text-secondary);"><?php echo htmlspecialchars($auth['email'] ?? '—'); ?></span></td>
+                                        <td><?php
+                                            $ast = $auth['status'] ?? 'approved';
+                                            $acls = $ast === 'pending' ? 'status-pending' : ($ast === 'rejected' ? 'status-rejected' : 'status-approved');
+                                        ?><span class="status-badge <?php echo $acls; ?>"><?php echo htmlspecialchars($ast); ?></span></td>
                                         <td>
                                             <div class="table-image-preview-node">
-                                                <div class="mini-thumbnail-frame" style="border-radius: 50%; width: 38px;">
+                                                <div class="mini-thumb-frame">
                                                     <img src="../<?php echo htmlspecialchars($auth['avatar_url']); ?>" alt="Avatar" onerror="this.src='https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80'">
                                                 </div>
-                                                <span class="image-file-string"><?php echo htmlspecialchars($auth['avatar_url']); ?></span>
                                             </div>
                                         </td>
                                         <td style="text-align: right; padding-right: 20px;">
                                             <div class="operation-icon-actions-cluster">
+                                                <?php if (($auth['status'] ?? '') === 'pending') { ?>
+                                                <a href="dashboard.php?approve_author=<?php echo $auth['author_id']; ?>" class="op-btn modify-view" title="Approve Author" style="color:#34d399;">
+                                                    <i class="fa-solid fa-check"></i>
+                                                </a>
+                                                <a href="dashboard.php?reject_author=<?php echo $auth['author_id']; ?>" class="op-btn drop-view" title="Reject Author">
+                                                    <i class="fa-solid fa-xmark"></i>
+                                                </a>
+                                                <?php } ?>
                                                 <a href="dashboard.php?edit_author=<?php echo $auth['author_id']; ?>" class="op-btn modify-view" title="Edit Properties">
                                                     <i class="fa-solid fa-pencil"></i>
                                                 </a>
-                                                <a href="dashboard.php?delete_author=<?php echo $auth['author_id']; ?>" 
+                                                <a href="dashboard.php?delete_author=<?php echo $auth['author_id']; ?>"
                                                    onclick="return confirm('Purge this author record permanently from table databases? Note: Authors linked to blog posts cannot be deleted.')" class="op-btn drop-view" title="Purge Record">
                                                     <i class="fa-solid fa-trash-can"></i>
                                                 </a>
@@ -544,7 +602,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                                 } 
                             } else { ?>
                                 <tr>
-                                    <td colspan="4">
+                                    <td colspan="6">
                                         <div class="empty-dashboard-state">
                                             <i class="fa-solid fa-users-slash empty-ghost-icon"></i>
                                             <p>No verified writers located in database table.</p>
@@ -562,8 +620,8 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
             <div class="posts-card">
                 <div class="table-header-action-row">
                     <div class="table-title-area">
-                        <h3><i class="fa-solid fa-database text-blue-icon"></i> Content Management</h3>
-                        <p class="row-count-tracker">Showing <?php echo $total_rows; ?> posts</p>
+                        <h3><i class="fa-solid fa-database text-blue-icon" style="padding-right: 5px;"></i> Content Management</h3>
+                        <p class="row-count-tracker" style="padding-top: 5px; margin: 0; padding-left: 30px;">Showing <?php echo $total_rows; ?> posts</p>
                     </div>
                     <div style="display: flex; gap: 12px;">
                         <a href="dashboard.php?action_mode=settings" class="initialize-creation-btn" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; border-color: rgba(56, 189, 248, 0.25);">
@@ -616,6 +674,11 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                                                     <i class="fa-regular fa-eye" style="color: var(--accent-blue); margin-right: 4px;"></i> 
                                                     <?php echo number_format($p['view_count']); ?> views
                                                 </span>
+                                                <?php
+                                                    $pst = $p['status'] ?? 'published';
+                                                    $pcls = $pst === 'pending' ? 'status-pending' : 'status-published';
+                                                ?>
+                                                <span class="status-badge <?php echo $pcls; ?>" style="margin-left:8px;"><?php echo htmlspecialchars($pst); ?></span>
                                                 <?php if ($p['view_count'] > 500) { ?>
                                                     <span class="popular-status-pill" style="width: max-content; padding: 2px 8px; font-size: 11px;">
                                                         <i class="fa-solid fa-fire-flame-curved"></i> Popular
@@ -625,6 +688,11 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                                         </td>
                                         <td style="text-align: right; padding-right: 20px;">
                                             <div class="operation-icon-actions-cluster">
+                                                <?php if (($p['status'] ?? 'published') === 'pending') { ?>
+                                                <a href="dashboard.php?publish_post=<?php echo $p['post_id']; ?>" class="op-btn modify-view" title="Publish Post" style="color:#34d399;">
+                                                    <i class="fa-solid fa-check-double"></i>
+                                                </a>
+                                                <?php } ?>
                                                 <a href="dashboard.php?view=<?php echo $p['post_id']; ?>" class="op-btn read-view" title="Inspect Live View">
                                                     <i class="fa-solid fa-eye"></i>
                                                 </a>
@@ -704,6 +772,35 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         }
     });
+
+    // --- Post editor live preview ---
+    (function () {
+        var titleIn = document.getElementById('admin_post_title');
+        var contentIn = document.getElementById('admin_post_content');
+        var coverIn = document.getElementById('admin_post_cover');
+        var liveTitle = document.getElementById('admin_live_title');
+        var liveExcerpt = document.getElementById('admin_live_excerpt');
+        var liveCover = document.getElementById('admin_live_cover');
+        if (!titleIn || !liveTitle) return;
+        titleIn.addEventListener('input', function () {
+            liveTitle.textContent = this.value || 'Your title appears here';
+        });
+        if (contentIn && liveExcerpt) {
+            contentIn.addEventListener('input', function () {
+                var t = this.value || 'Your article excerpt will show here as you type...';
+                liveExcerpt.textContent = t.length > 180 ? t.substring(0, 180) + '...' : t;
+            });
+        }
+        if (coverIn && liveCover) {
+            coverIn.addEventListener('change', function () {
+                if (this.files && this.files[0]) {
+                    var reader = new FileReader();
+                    reader.onload = function (e) { liveCover.src = e.target.result; };
+                    reader.readAsDataURL(this.files[0]);
+                }
+            });
+        }
+    })();
 });
 </script>
 

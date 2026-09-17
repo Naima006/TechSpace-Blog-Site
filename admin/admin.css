@@ -101,7 +101,7 @@ body::after {
     box-shadow: 0 0 15px rgba(96, 165, 250, 0.15);
 }
 
-.login-card button {
+.login-card button[type="submit"] {
     padding: 14px;
     border: none;
     border-radius: 10px;
@@ -110,9 +110,10 @@ body::after {
     cursor: pointer;
     font-weight: 700;
     transition: all 0.3s ease;
+    width: 100%;
 }
 
-.login-card button:hover {
+.login-card button[type="submit"]:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(96, 165, 250, 0.3);
 }
@@ -933,4 +934,353 @@ body::after {
         width: 100%;
         justify-content: center;
     }
+}
+/* ---------- Password show/hide (inside field) ---------- */
+.password-field-wrap {
+    position: relative !important;
+    width: 100%;
+    display: block;
+}
+
+.password-field-wrap input[type="password"],
+.password-field-wrap input[type="text"] {
+    width: 100% !important;
+    padding-right: 48px !important;
+    box-sizing: border-box;
+}
+
+.login-card .toggle-password-btn,
+.password-field-wrap .toggle-password-btn,
+button.toggle-password-btn {
+    position: absolute !important;
+    right: 10px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    background: transparent !important;
+    border: none !important;
+    color: #9ca3af !important;
+    cursor: pointer !important;
+    padding: 8px !important;
+    margin: 0 !important;
+    font-size: 15px !important;
+    line-height: 1 !important;
+    min-width: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    box-shadow: none !important;
+    border-radius: 6px !important;
+    z-index: 2;
+}
+
+.login-card .toggle-password-btn:hover,
+.password-field-wrap .toggle-password-btn:hover,
+button.toggle-password-btn:hover {
+    color: #60a5fa !important;
+    background: rgba(96, 165, 250, 0.1) !important;
+    transform: translateY(-50%) !important;
+    box-shadow: none !important;
+}
+
+/* Author auth tab switcher */
+.auth-mode-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--glass-border, rgba(255,255,255,0.07));
+    border-radius: 12px;
+    padding: 4px;
+}
+
+.auth-mode-tabs a {
+    flex: 1;
+    text-align: center;
+    text-decoration: none !important;
+    color: var(--text-secondary, #9ca3af) !important;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 12px;
+    border-radius: 9px;
+    transition: all 0.25s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: none !important;
+    background: transparent !important;
+}
+
+.auth-mode-tabs a:hover {
+    color: var(--text-primary, #f3f4f6) !important;
+    background: rgba(255,255,255,0.05) !important;
+}
+
+.auth-mode-tabs a.active-tab {
+    color: #0b0f19 !important;
+    background: var(--accent-blue, #60a5fa) !important;
+}
+
+/* Alias for author logout (matches existing .logout-btn) */
+.logout-action-btn {
+    text-decoration: none;
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+.logout-action-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    transform: translateY(-2px);
+}
+
+/* Fix both class names for small avatars in tables */
+.mini-thumb-frame,
+.mini-thumbnail-frame {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border, rgba(255,255,255,0.07));
+    background: rgba(0,0,0,0.3);
+    flex-shrink: 0;
+}
+.mini-thumb-frame img,
+.mini-thumbnail-frame img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block;
+}
+.table-image-preview-node {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    max-width: 220px;
+}
+.table-image-preview-node .image-file-string {
+    font-size: 11px;
+    color: var(--text-secondary, #9ca3af);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+}
+
+/* Post editor + live preview: side-by-side, constrained */
+.post-preview-workspace {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+    width: 100%;
+}
+@media (max-width: 960px) {
+    .post-preview-workspace {
+        grid-template-columns: 1fr !important;
+    }
+}
+.post-preview-workspace > form {
+    min-width: 0;
+}
+.post-preview-workspace .live-sandbox-preview-frame {
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    min-width: 0;
+}
+.live-post-preview-card {
+    background: rgba(17, 24, 39, 0.65);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    overflow: hidden;
+}
+.live-post-preview-card .preview-cover {
+    width: 100%;
+    height: 160px !important;
+    max-height: 180px;
+    object-fit: cover !important;
+    background: rgba(0,0,0,0.35);
+    display: block;
+}
+.live-post-preview-card .preview-body {
+    padding: 16px 18px 20px;
+}
+.live-post-preview-card .preview-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+    line-height: 1.35;
+    word-break: break-word;
+}
+.live-post-preview-card .preview-excerpt {
+    font-size: 13px;
+    color: #9ca3af;
+    line-height: 1.55;
+    word-break: break-word;
+}
+
+/* Action focus card: allow full visibility */
+.action-focus-card {
+    max-height: none !important;
+    overflow: visible !important;
+}
+.form-card.action-focus-card {
+    overflow: visible !important;
+}
+.form-card textarea {
+    min-height: 140px;
+    max-height: 280px;
+    resize: vertical;
+}
+
+/* Modern scrollbars for admin + author portals */
+.dashboard-body,
+.dashboard-container,
+.live-sandbox-preview-frame,
+.builder-scroll-zone,
+.posts-card,
+.form-card,
+.table-responsive-wrapper {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(96, 165, 250, 0.35) rgba(255,255,255,0.04);
+}
+.dashboard-body::-webkit-scrollbar,
+.dashboard-container::-webkit-scrollbar,
+.live-sandbox-preview-frame::-webkit-scrollbar,
+.builder-scroll-zone::-webkit-scrollbar,
+.posts-card::-webkit-scrollbar,
+.form-card::-webkit-scrollbar,
+.table-responsive-wrapper::-webkit-scrollbar,
+textarea::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.dashboard-body::-webkit-scrollbar-track,
+.live-sandbox-preview-frame::-webkit-scrollbar-track,
+.builder-scroll-zone::-webkit-scrollbar-track,
+.table-responsive-wrapper::-webkit-scrollbar-track,
+textarea::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+}
+.dashboard-body::-webkit-scrollbar-thumb,
+.live-sandbox-preview-frame::-webkit-scrollbar-thumb,
+.builder-scroll-zone::-webkit-scrollbar-thumb,
+.table-responsive-wrapper::-webkit-scrollbar-thumb,
+textarea::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.35);
+    border-radius: 8px;
+}
+.dashboard-body::-webkit-scrollbar-thumb:hover,
+.live-sandbox-preview-frame::-webkit-scrollbar-thumb:hover,
+textarea::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.55);
+}
+
+/* Authors table: prevent huge cells */
+.dashboard-data-table td {
+    vertical-align: middle;
+}
+.dashboard-data-table img {
+    max-width: 48px;
+    max-height: 48px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+
+/* Status badges for author / post moderation */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.status-pending {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.status-approved, .status-published {
+    background: rgba(52, 211, 153, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.28);
+}
+.status-rejected {
+    background: rgba(248, 113, 113, 0.12);
+    color: #f87171;
+    border: 1px solid rgba(248, 113, 113, 0.28);
+}
+
+/* Post live preview sandbox (reuses settings pattern) */
+.post-preview-workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+@media (max-width: 960px) {
+    .post-preview-workspace {
+        grid-template-columns: 1fr;
+    }
+}
+.live-post-preview-card {
+    background: var(--glass-bg, rgba(17, 24, 39, 0.65));
+    border: 1px solid var(--glass-border, rgba(255,255,255,0.07));
+    border-radius: 16px;
+    overflow: hidden;
+}
+.live-post-preview-card .preview-cover {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    background: rgba(0,0,0,0.35);
+    display: block;
+}
+.live-post-preview-card .preview-body {
+    padding: 16px 18px 20px;
+}
+.live-post-preview-card .preview-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+    line-height: 1.35;
+}
+.live-post-preview-card .preview-excerpt {
+    font-size: 13px;
+    color: var(--text-secondary, #9ca3af);
+    line-height: 1.55;
+}
+
+
+/* Post editor preview must NOT use the fixed 640px settings sandbox height */
+.post-preview-workspace .live-sandbox-preview-frame {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 16px !important;
+}
+.post-preview-workspace .sandbox-scale-wrapper {
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+    pointer-events: auto !important;
 }

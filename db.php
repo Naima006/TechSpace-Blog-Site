@@ -2,16 +2,14 @@
 /**
  * TechSpace - Database Connection + Auto Setup
  * --------------------------------------------
- * Connects to MySQL and ensures the database, tables, and
- * essential default records exist. Existing data is never
- * overwritten or deleted.
+ * Creates database/tables if missing and seeds defaults only when empty.
+ * Existing data is never overwritten or deleted.
  *
- * Tables required by the current codebase:
- *   - admins        (admin_id, username, password)
- *   - authors       (author_id, author_name, avatar_url)
- *   - blog_posts    (post_id, title, cover_image, content,
- *                    published_date, is_popular, author_id, view_count)
- *   - site_settings (setting_key, setting_value)
+ * Tables:
+ *   admins, authors, blog_posts, site_settings
+ * Extra columns (added safely if missing):
+ *   authors.email, authors.password, authors.status
+ *   blog_posts.status
  */
 
 $servername = "localhost";
@@ -19,22 +17,19 @@ $username   = "root";
 $password   = "";
 $database   = "db_blog";
 
-// 1. Connect to MySQL server (without selecting a database yet)
 $conn = @mysqli_connect($servername, $username, $password);
 
 if (!$conn) {
     die("Connection Failed: " . mysqli_connect_error());
 }
 
-// 2. Create the database if it does not exist
 mysqli_query($conn, "CREATE DATABASE IF NOT EXISTS `$database` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
-// 3. Select the database
 if (!mysqli_select_db($conn, $database)) {
     die("Could not select database `$database`: " . mysqli_error($conn));
 }
 
-// 4. Create tables if they do not exist (IF NOT EXISTS = safe for existing data)
+/* ---------- Core tables ---------- */
 
 mysqli_query($conn, "
     CREATE TABLE IF NOT EXISTS `admins` (
@@ -48,7 +43,10 @@ mysqli_query($conn, "
     CREATE TABLE IF NOT EXISTS `authors` (
         `author_id` INT AUTO_INCREMENT PRIMARY KEY,
         `author_name` VARCHAR(150) NOT NULL,
-        `avatar_url` VARCHAR(255) DEFAULT 'avatar1.png'
+        `avatar_url` VARCHAR(255) DEFAULT 'avatar1.png',
+        `email` VARCHAR(150) DEFAULT NULL,
+        `password` VARCHAR(255) DEFAULT NULL,
+        `status` ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved'
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ");
 
@@ -62,9 +60,11 @@ mysqli_query($conn, "
         `is_popular` TINYINT(1) DEFAULT 0,
         `author_id` INT NOT NULL,
         `view_count` INT UNSIGNED DEFAULT 0,
+        `status` ENUM('pending','published') NOT NULL DEFAULT 'published',
         INDEX (`author_id`),
         INDEX (`published_date`),
-        INDEX (`view_count`)
+        INDEX (`view_count`),
+        INDEX (`status`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ");
 
@@ -75,35 +75,61 @@ mysqli_query($conn, "
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ");
 
-// 5. Seed default admin only if no admins exist
-$admin_check = mysqli_query($conn, "SELECT admin_id FROM admins LIMIT 1");
-if ($admin_check && mysqli_num_rows($admin_check) === 0) {
-    // Default credentials (kept simple for internship project):
-    // Username: admin
-    // Password: admin321
-    mysqli_query($conn, "
-        INSERT INTO admins (username, password)
-        VALUES ('admin', 'admin321')
-    ");
+/* ---------- Safe column upgrades for existing installs ---------- */
+
+function ts_column_exists($conn, $table, $column) {
+    $table  = mysqli_real_escape_string($conn, $table);
+    $column = mysqli_real_escape_string($conn, $column);
+    $res = mysqli_query($conn, "SHOW COLUMNS FROM `$table` LIKE '$column'");
+    return $res && mysqli_num_rows($res) > 0;
 }
 
-// 6. Seed default authors only if none exist
+if (!ts_column_exists($conn, 'authors', 'email')) {
+    mysqli_query($conn, "ALTER TABLE `authors` ADD COLUMN `email` VARCHAR(150) DEFAULT NULL");
+}
+if (!ts_column_exists($conn, 'authors', 'password')) {
+    mysqli_query($conn, "ALTER TABLE `authors` ADD COLUMN `password` VARCHAR(255) DEFAULT NULL");
+}
+if (!ts_column_exists($conn, 'authors', 'status')) {
+    mysqli_query($conn, "ALTER TABLE `authors` ADD COLUMN `status` ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved'");
+}
+if (!ts_column_exists($conn, 'blog_posts', 'status')) {
+    mysqli_query($conn, "ALTER TABLE `blog_posts` ADD COLUMN `status` ENUM('pending','published') NOT NULL DEFAULT 'published'");
+}
+if (!ts_column_exists($conn, 'blog_posts', 'view_count')) {
+    mysqli_query($conn, "ALTER TABLE `blog_posts` ADD COLUMN `view_count` INT UNSIGNED DEFAULT 0");
+}
+if (!ts_column_exists($conn, 'blog_posts', 'is_popular')) {
+    mysqli_query($conn, "ALTER TABLE `blog_posts` ADD COLUMN `is_popular` TINYINT(1) DEFAULT 0");
+}
+
+/* Add unique email index only if it does not already exist (safe on every request) */
+$idx_check = mysqli_query($conn, "SHOW INDEX FROM `authors` WHERE Key_name = 'uniq_author_email'");
+if (!$idx_check || mysqli_num_rows($idx_check) === 0) {
+    mysqli_query($conn, "ALTER TABLE `authors` ADD UNIQUE KEY `uniq_author_email` (`email`)");
+}
+
+/* ---------- Seed defaults only when empty ---------- */
+
+$admin_check = mysqli_query($conn, "SELECT admin_id FROM admins LIMIT 1");
+if ($admin_check && mysqli_num_rows($admin_check) === 0) {
+    mysqli_query($conn, "INSERT INTO admins (username, password) VALUES ('admin', 'admin321')");
+}
+
 $author_check = mysqli_query($conn, "SELECT author_id FROM authors LIMIT 1");
 if ($author_check && mysqli_num_rows($author_check) === 0) {
     mysqli_query($conn, "
-        INSERT INTO authors (author_name, avatar_url) VALUES
-        ('John Doe', 'avatar1.png'),
-        ('Jane Doe', 'avatar2.png'),
-        ('Jack Doe', 'avatar3.png')
+        INSERT INTO authors (author_name, avatar_url, status) VALUES
+        ('John Doe', 'avatar.png', 'approved'),
+        ('Jane Doe', 'avatar1.png', 'approved'),
+        ('Jack Doe', 'avatar2.png', 'approved')
     ");
 }
 
-// 7. Seed default site settings only for missing keys
-//    (uses INSERT IGNORE so existing values are never overwritten)
 $default_settings = [
     'site_slogan'      => 'Your guide to the digital age',
     'about_heading'    => 'About TechSpace',
-    'about_text'       => "TechSpace is a modern technology blog dedicated to sharing insights on Artificial Intelligence, Cybersecurity, Software Development, and emerging tech trends.\n\nBuilt during a Software Development Internship at IT Lab Solutions Ltd., Sylhet.",
+    'about_text'       => "TechSpace is a modern technology blog dedicated to sharing insights on Artificial Intelligence, Cybersecurity, Software Development, and emerging tech trends.\n\nOur mission is to empower readers with knowledge and practical advice to navigate the ever-evolving digital landscape.",
     'contact_heading'  => 'Contact Us',
     'contact_text'     => 'Have questions or suggestions? We would love to hear from you.',
     'contact_email'    => 'support@techspace.com',
@@ -116,40 +142,31 @@ $default_settings = [
 foreach ($default_settings as $key => $value) {
     $safe_key   = mysqli_real_escape_string($conn, $key);
     $safe_value = mysqli_real_escape_string($conn, $value);
-    // Only insert if the key does not already exist
     mysqli_query($conn, "
         INSERT IGNORE INTO site_settings (setting_key, setting_value)
         VALUES ('$safe_key', '$safe_value')
     ");
 }
 
-// 8. Optional: seed one sample post only when the posts table is completely empty
-//    (so a fresh install is not blank; existing posts are left untouched)
 $post_check = mysqli_query($conn, "SELECT post_id FROM blog_posts LIMIT 1");
 if ($post_check && mysqli_num_rows($post_check) === 0) {
-    // Pick the first author (John Doe) if available
     $first_author = mysqli_query($conn, "SELECT author_id FROM authors ORDER BY author_id ASC LIMIT 1");
     if ($first_author && $row = mysqli_fetch_assoc($first_author)) {
         $aid = (int)$row['author_id'];
-        $sample_title   = mysqli_real_escape_string($conn, 'Welcome to TechSpace');
+        $sample_title   = mysqli_real_escape_string($conn, 'The Future of Artificial Intelligence');
         $sample_content = mysqli_real_escape_string($conn,
-            "Welcome to TechSpace — your guide to the digital age.\n\n" .
-            "This is a sample post created automatically on first setup. " .
-            "You can edit or delete it from the Admin Dashboard, and add your own articles anytime.\n\n" .
-            "Features already working on this site:\n" .
-            "• Dynamic blog posts with cover images\n" .
-            "• Author profiles and avatars\n" .
-            "• Search by title or author name\n" .
-            "• Pagination and archives\n" .
-            "• View counters and popular posts\n" .
-            "• Editable site settings from the admin panel\n\n" .
-            "Happy coding!"
+            "Artificial intelligence is rapidly transitioning from specialized research labs into the core fabric of daily life and global industry. As machine learning architectures evolve, AI systems are moving beyond basic automation toward contextual reasoning, multimodal perception, and autonomous problem-solving.\n\n" .
+            "Key developments redefining the landscape include:\n\n" .
+            "• Autonomous Agents: Systems capable of executing multi-step workflows, writing software, and managing operations with minimal human intervention.\n" .
+            "• Multimodal Systems: Unified models processing text, audio, image, and real-time sensory data simultaneously for natural human-computer interaction.\n" .
+            "• Healthcare & Discovery: Accelerated molecular modeling, personalized treatments, and early disease detection powered by deep neural networks.\n" .
+            "• Edge AI & Efficiency: Lightweight, quantized architectures running locally on edge devices to preserve data privacy and reduce network latency.\n\n" .
+            "As these technologies mature, the fundamental challenge shifts from raw computational capability to responsible deployment—balancing breakthrough innovation with robust security, interpretability, and ethical governance."
         );
         mysqli_query($conn, "
-            INSERT INTO blog_posts (title, cover_image, content, author_id, is_popular, view_count)
-            VALUES ('$sample_title', 'blog1.png', '$sample_content', $aid, 0, 0)
+            INSERT INTO blog_posts (title, cover_image, content, author_id, is_popular, view_count, status)
+            VALUES ('$sample_title', 'blog1.png', '$sample_content', $aid, 0, 0, 'published')
         ");
     }
 }
-
 ?>

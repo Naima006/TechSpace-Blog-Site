@@ -91,7 +91,7 @@ if(isset($_POST['login'])){
     <div class="login-card">
 
         <h1>
-            <i class="fa-solid fa-user-shield"></i>
+            <i class="fa-solid fa-user-shield" style="padding-right: 10px;"></i>
             Admin Login
         </h1>
 
@@ -109,13 +109,21 @@ if(isset($_POST['login'])){
                 type="text"
                 name="username"
                 placeholder="Username"
-                required>
+                required
+                autocomplete="username">
 
-            <input
-                type="password"
-                name="password"
-                placeholder="Password"
-                required>
+            <div class="password-field-wrap">
+                <input
+                    type="password"
+                    name="password"
+                    id="adminPassword"
+                    placeholder="Password"
+                    required
+                    autocomplete="current-password">
+                <button type="button" class="toggle-password-btn" id="toggleAdminPassword" aria-label="Show password" title="Show / hide password">
+                    <i class="fa-solid fa-eye" id="toggleAdminPasswordIcon"></i>
+                </button>
+            </div>
 
             <button
                 type="submit"
@@ -130,6 +138,24 @@ if(isset($_POST['login'])){
     </div>
 
 </div>
+
+<script>
+document.getElementById('toggleAdminPassword').addEventListener('click', function () {
+    var input = document.getElementById('adminPassword');
+    var icon = document.getElementById('toggleAdminPasswordIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+        this.setAttribute('aria-label', 'Hide password');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+        this.setAttribute('aria-label', 'Show password');
+    }
+});
+</script>
 
 </body>
 </html>

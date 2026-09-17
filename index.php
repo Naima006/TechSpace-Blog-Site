@@ -13,7 +13,7 @@ while ($set_row = mysqli_fetch_assoc($settings_query)) {
     $site[$set_row['setting_key']] = $set_row['setting_value'];
 }
 
-/** 👁️ SINGLE POST VIEW COUNT TRACKER MECHANISM */
+/** SINGLE POST VIEW COUNT TRACKER MECHANISM */
 if (isset($_GET['post'])) {
     $post_id = (int)$_GET['post'];
 
@@ -26,6 +26,7 @@ if (isset($_GET['post'])) {
         JOIN authors
         ON blog_posts.author_id = authors.author_id
         WHERE post_id = $post_id
+          AND blog_posts.status = 'published'
     ";
 
     $single_result = mysqli_query($conn, $single_query);
@@ -42,7 +43,7 @@ $limit = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 3;
 $current_page = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
 $offset = ($current_page - 1) * $limit;
 
-$count_where = "WHERE 1=1";
+$count_where = "WHERE blog_posts.status = 'published'";
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $search_clean = mysqli_real_escape_string($conn, trim($_GET['search']));
     $count_where .= " AND (blog_posts.title LIKE '%$search_clean%' OR authors.author_name LIKE '%$search_clean%')";
@@ -61,8 +62,9 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
         SELECT *
         FROM blog_posts
         JOIN authors ON blog_posts.author_id = authors.author_id
-        WHERE blog_posts.title LIKE '%$search%' 
-           OR authors.author_name LIKE '%$search%'
+        WHERE blog_posts.status = 'published'
+          AND (blog_posts.title LIKE '%$search%' 
+           OR authors.author_name LIKE '%$search%')
         ORDER BY published_date DESC
         LIMIT $limit OFFSET $offset
     ";
@@ -71,7 +73,8 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
         SELECT *
         FROM blog_posts
         JOIN authors ON blog_posts.author_id = authors.author_id
-        WHERE MONTH(published_date) = $month
+        WHERE blog_posts.status = 'published'
+        AND MONTH(published_date) = $month
         AND YEAR(published_date) = $year
         ORDER BY published_date DESC
         LIMIT $limit OFFSET $offset
@@ -81,6 +84,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
         SELECT *
         FROM blog_posts
         JOIN authors ON blog_posts.author_id = authors.author_id
+        WHERE blog_posts.status = 'published'
         ORDER BY published_date DESC
         LIMIT $limit OFFSET $offset
     ";
@@ -91,7 +95,7 @@ $result = mysqli_query($conn, $query);
 /** SIDEBAR: ONLY CHOOSE ARTICLES THAT HAVE EXCEEDED 500 VIEWS */
 $popular = mysqli_query(
     $conn,
-    "SELECT * FROM blog_posts WHERE view_count > 500 ORDER BY view_count DESC LIMIT 5"
+    "SELECT * FROM blog_posts WHERE status = 'published' AND view_count > 500 ORDER BY view_count DESC LIMIT 5"
 );
 
 $archives = mysqli_query(
@@ -101,6 +105,7 @@ $archives = mysqli_query(
         title,
         DATE_FORMAT(published_date, '%M %Y') AS archive_month
         FROM blog_posts
+        WHERE status = 'published'
         ORDER BY published_date DESC"
 );
 ?>
@@ -134,20 +139,26 @@ $archives = mysqli_query(
 
     <nav>
         <ul>
-            <li><a href="index.php?page=home" class="active"><i class="fa-solid rel-icon fa-house"></i> Home</a></li>
-            <li><a href="index.php?page=about"><i class="fa-solid rel-icon fa-circle-info"></i> About</a></li>
-            <li><a href="index.php?page=contact"><i class="fa-solid rel-icon fa-envelope"></i> Contact</a></li>
+            <li><a href="index.php?page=home" class="<?php echo ($page === 'home' && !isset($_GET['post']) && empty($search) && !$month) ? 'active' : ''; ?>"><i class="fa-solid rel-icon fa-house"></i> Home</a></li>
+            <li><a href="index.php?page=about" class="<?php echo ($page === 'about') ? 'active' : ''; ?>"><i class="fa-solid rel-icon fa-circle-info"></i> About</a></li>
+            <li><a href="index.php?page=contact" class="<?php echo ($page === 'contact') ? 'active' : ''; ?>"><i class="fa-solid rel-icon fa-envelope"></i> Contact</a></li>
         </ul>
-        <form method="GET" action="index.php">
-            <div class="search-box">
-                <input
-                    type="text"
-                    name="search"
-                    placeholder="Search premium articles..."
-                    value="<?php echo htmlspecialchars($search); ?>">
-                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <div class="nav-right-cluster">
+            <form method="GET" action="index.php">
+                <div class="search-box">
+                    <input
+                        type="text"
+                        name="search"
+                        placeholder="Search premium articles..."
+                        value="<?php echo htmlspecialchars($search); ?>">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                </div>
+            </form>
+            <div class="nav-auth-actions">
+                <a href="author/index.php" class="nav-auth-btn" title="Author Login"><i class="fa-solid fa-right-to-bracket"></i> <span>Sign In</span></a>
+                <a href="author/index.php?mode=register" class="nav-auth-btn nav-auth-primary" title="Become an Author"><i class="fa-solid fa-user-plus"></i> <span>Register</span></a>
             </div>
-        </form>
+        </div>
     </nav>
 
     <div class="container">
@@ -469,9 +480,9 @@ $archives = mysqli_query(
             <div class="social-block">
                 <span class="social-title">Connect</span>
                 <div class="social-links" id="footer-socials">
-                    <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
-                    <a href="#" title="Twitter"><i class="fab fa-x-twitter"></i></a>
-                    <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                    <a href="https://www.facebook.com" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                    <a href="https://twitter.com" title="Twitter"><i class="fab fa-x-twitter"></i></a>
+                    <a href="https://www.linkedin.com/in/naima-rahman-176196308/" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
                 </div>
             </div>
         </div>
