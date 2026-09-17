@@ -2,7 +2,7 @@
 session_start();
 require_once __DIR__ . '/../db.php';
 
-/** 🔒 SECURE SESSION MANAGEMENT TIMEOUT LAYER */
+/** Server-side cookie-based timeout session management */
 if (isset($_SESSION['admin_id'])) {
     $current_timestamp = time();
     $timeout_duration = 600; // (10min * 60)
