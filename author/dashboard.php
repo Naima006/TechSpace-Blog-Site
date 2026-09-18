@@ -206,18 +206,16 @@ $show_form = $edit_post || (isset($_GET['action_mode']) && $_GET['action_mode'] 
                 <h2 class="preview-title"><?php echo htmlspecialchars($view_post['title']); ?></h2>
                 <div class="preview-body-text post-html-body" style="max-height: none;"><?php
                     $vc = $view_post['content'];
-                    if (preg_match('/<(p|br|strong|b|em|i|u|ul|ol|li|a|h[1-6])\b/i', $vc)) {
-                        echo strip_tags($vc, '<p><br><br/><strong><b><em><i><u><ul><ol><li><a><h2><h3><h4><blockquote>');
-                    } else {
-                        echo nl2br(htmlspecialchars($vc));
-                    }
+                    echo ts_render_post_html($vc);
                 ?></div>
                 <p style="margin-top:14px;"><span class="status-badge <?php echo ($view_post['status'] ?? '') === 'pending' ? 'status-pending' : 'status-published'; ?>"><?php echo htmlspecialchars($view_post['status'] ?? 'published'); ?></span></p>
             </div>
         </div>
-        <div class="form-button-cluster" style="margin-top: 16px;">
-            <a href="dashboard.php?edit=<?php echo (int)$view_post['post_id']; ?>" class="submit-action-btn"><i class="fa-solid fa-pencil"></i> Edit</a>
+        <div class="inspect-action-footer-toolbar" style="margin-top: 20px; max-width: 720px; margin-left: auto; margin-right: auto; width: 100%;">
             <a href="dashboard.php" class="cancel-action-btn"><i class="fa-solid fa-arrow-left"></i> Back</a>
+            <div class="right-side-ops">
+                <a href="dashboard.php?edit=<?php echo (int)$view_post['post_id']; ?>" class="submit-action-btn"><i class="fa-solid fa-pencil"></i> Edit</a>
+            </div>
         </div>
     </div>
     <?php } ?>
@@ -290,11 +288,7 @@ $show_form = $edit_post || (isset($_GET['action_mode']) && $_GET['action_mode'] 
                         <h2 class="preview-title" id="live_title_preview"><?php echo htmlspecialchars($edit_post['title'] ?? 'Your title appears here'); ?></h2>
                         <div class="preview-body-text post-html-body" id="live_excerpt_preview"><?php
                             $ex = $edit_post['content'] ?? 'Your full article content will appear here as you type.';
-                            if (preg_match('/<(p|br|strong|b|em|i|u|ul|ol|li|a|h[1-6])\b/i', $ex)) {
-                                echo strip_tags($ex, '<p><br><br/><strong><b><em><i><u><ul><ol><li><a><h2><h3><h4><blockquote>');
-                            } else {
-                                echo nl2br(htmlspecialchars($ex));
-                            }
+                            echo ts_render_post_html($ex);
                         ?></div>
                     </div>
                 </div>
@@ -414,22 +408,51 @@ $show_form = $edit_post || (isset($_GET['action_mode']) && $_GET['action_mode'] 
         }
     }
 
+
+    function syncLivePreviewToEditorBottom() {
+        var ed = document.querySelector('.post-preview-workspace .tox-tinymce');
+        var card = document.querySelector('.post-preview-workspace .live-blog-preview-card');
+        if (!ed || !card) return;
+        var edRect = ed.getBoundingClientRect();
+        var cardRect = card.getBoundingClientRect();
+        var nextH = Math.round(edRect.bottom - cardRect.top);
+        if (nextH < 420) nextH = 420;
+        if (nextH > 900) nextH = 900;
+        card.style.height = nextH + 'px';
+        card.style.minHeight = nextH + 'px';
+        card.style.maxHeight = nextH + 'px';
+    }
+
+    window.addEventListener('resize', function () {
+        clearTimeout(window.__tsPreviewSyncTimer);
+        window.__tsPreviewSyncTimer = setTimeout(syncLivePreviewToEditorBottom, 100);
+    });
     if (contentIn && typeof tinymce !== 'undefined') {
         tinymce.init({
             selector: '#post_content_input',
-            height: 280,
+            height: 520,
+            min_height: 520,
+            max_height: 520,
             menubar: false,
             branding: false,
             promotion: false,
             statusbar: false,
             elementpath: false,
-            plugins: 'lists link autoresize',
-            toolbar: 'undo redo | styles | bold italic underline | bullist numlist | link | removeformat',
+                forced_root_block: 'p',
+                block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4',
+                valid_elements: 'p,br,strong/b,em/i,u,ul,ol,li,a[href|target],h2,h3,h4,blockquote',
+                invalid_elements: 'div,span,script,iframe',
+            plugins: 'lists link',
+            toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | link | removeformat',
             skin: 'oxide-dark',
             content_css: 'dark',
             placeholder: 'Start writing your blog here...',
-            content_style: 'body { font-family: Plus Jakarta Sans, sans-serif; font-size: 14px; color: #e5e7eb; background-color: #0b0f19; } body[data-mce-placeholder]:before { color: #6b7280 !important; }',
+            content_style: 'body { font-family: Plus Jakarta Sans, sans-serif; font-size: 15px; color: #e5e7eb; background-color: #0b0f19; line-height: 1.75; margin: 12px 14px; } p { margin: 0 0 1em; } ul, ol { margin: 0 0 1em 1.35em; padding: 0; } li { margin: 0 0 0.45em; line-height: 1.65; } li > p { margin: 0; } h2, h3, h4 { color: #f3f4f6; margin: 1.15em 0 0.55em; line-height: 1.3; } a { color: #60a5fa; } body[data-mce-placeholder]:before { color: #6b7280 !important; } html { scrollbar-width: thin; scrollbar-color: rgba(96,165,250,0.45) rgba(255,255,255,0.06); } ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 8px; } ::-webkit-scrollbar-thumb { background: rgba(96,165,250,0.4); border-radius: 8px; } ::-webkit-scrollbar-thumb:hover { background: rgba(96,165,250,0.6); } ',
             setup: function (editor) {
+                editor.on('init', function () {
+                    setTimeout(syncLivePreviewToEditorBottom, 50);
+                    setTimeout(syncLivePreviewToEditorBottom, 300);
+                });
                 editor.on('init change keyup SetContent', function () {
                     editor.save();
                     updateContentPreview(editor.getContent());

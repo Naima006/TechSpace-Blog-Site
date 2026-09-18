@@ -237,11 +237,7 @@ for ($i = 0; $i < 6; $i++) {
                     <h2><?php echo $selected_post['title']; ?></h2>
                     <div class="full-content post-html-body"><?php
                         $pc = $selected_post['content'];
-                        if (preg_match('/<(p|br|strong|b|em|i|u|ul|ol|li|a|h[1-6])\b/i', $pc)) {
-                            echo strip_tags($pc, '<p><br><br/><strong><b><em><i><u><ul><ol><li><a><h2><h3><h4><blockquote>');
-                        } else {
-                            echo nl2br(htmlspecialchars($pc));
-                        }
+                        echo ts_render_post_html($pc);
                     ?></div>
                                         <div class="post-footer-actions">
                         <a href="index.php" class="post-back-btn"><i class="fa-solid fa-arrow-left"></i> Back</a>
@@ -785,6 +781,31 @@ for ($i = 0; $i < 6; $i++) {
     </script>
 
 
+
+
+    <!-- Scroll to top -->
+    <button type="button" class="scroll-top-btn" id="scrollTopBtn" aria-label="Scroll to top" title="Back to top">
+        <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+    </button>
+    <script>
+    (function () {
+        var btn = document.getElementById('scrollTopBtn');
+        if (!btn) return;
+        var threshold = 320;
+        function update() {
+            if (window.scrollY > threshold) {
+                btn.classList.add('is-visible');
+            } else {
+                btn.classList.remove('is-visible');
+            }
+        }
+        window.addEventListener('scroll', update, { passive: true });
+        update();
+        btn.addEventListener('click', function () {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    })();
+    </script>
 
 </body>
 </html>

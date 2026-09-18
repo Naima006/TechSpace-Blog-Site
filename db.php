@@ -169,4 +169,40 @@ if ($post_check && mysqli_num_rows($post_check) === 0) {
         ");
     }
 }
-?>
+
+/**
+ * Render blog HTML the same in public, admin view, author view, and preview seed.
+ * TinyMCE often stores blocks as <div>; strip_tags would remove them and glue text together.
+ * MUST stay inside PHP (before any closing ?>) or the function will not be defined.
+ */
+function ts_render_post_html($content) {
+    if ($content === null || $content === '') {
+        return '';
+    }
+    $content = (string) $content;
+
+    // Legacy plain text
+    if (!preg_match('/<\s*[a-zA-Z]/', $content)) {
+        return nl2br(htmlspecialchars($content, ENT_QUOTES, 'UTF-8'));
+    }
+
+    // Normalize block wrappers TinyMCE may emit
+    $content = preg_replace('/<\s*div(\s[^>]*)?>/i', '<p>', $content);
+    $content = preg_replace('/<\s*\/\s*div\s*>/i', '</p>', $content);
+    $content = preg_replace('/<\s*section(\s[^>]*)?>/i', '<p>', $content);
+    $content = preg_replace('/<\s*\/\s*section\s*>/i', '</p>', $content);
+    $content = preg_replace('/<\s*span(\s[^>]*)?>/i', '', $content);
+    $content = preg_replace('/<\s*\/\s*span\s*>/i', '', $content);
+
+    $allowed = '<p><br><br/><strong><b><em><i><u><ul><ol><li><a><h1><h2><h3><h4><h5><h6><blockquote>';
+    $clean = strip_tags($content, $allowed);
+
+    // Empty <p></p> → visible blank line
+    $clean = preg_replace('/<p>\s*<\/p>/i', '<p><br></p>', $clean);
+
+    // Merge accidental nested <p><p>
+    $clean = preg_replace('/<p>\s*<p>/i', '<p>', $clean);
+    $clean = preg_replace('/<\/p>\s*<\/p>/i', '</p>', $clean);
+
+    return $clean;
+}

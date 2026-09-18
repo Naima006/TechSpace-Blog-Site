@@ -231,7 +231,6 @@ Example:
 * Password hashing with `password_hash()` and `password_verify()`
 * Prepared statements across database queries
 * Email verification for author registration
-* Rich text editor for article content
 * Improved image storage and file validation
 * Automated database backup and restore
 * Additional security improvements for production deployment
