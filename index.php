@@ -435,7 +435,7 @@ for ($i = 0; $i < 6; $i++) {
         
         <div class="sidebar">
             <div class="sidebar-widget">
-                <h3><i class="fa-solid fa-fire text-accent"></i> Popular Blogs</h3>
+                <h3><i class="fa-solid fa-fire text-accent"></i> Popular &nbsp Blogs</h3>
                 <ul class="popular-list">
                     <?php while ($p = mysqli_fetch_assoc($popular)) { ?>
                         <li>

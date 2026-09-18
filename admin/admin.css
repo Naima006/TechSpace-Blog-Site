@@ -1798,3 +1798,69 @@ html {
     white-space: nowrap;
     min-width: 0;
 }
+
+
+/* ---------- Status column: clean stack (views + badges) ---------- */
+.status-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.status-cell-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-cell .status-badge {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.status-cell .popular-status-pill {
+    margin: 0;
+    width: auto;
+    max-width: 100%;
+    padding: 4px 10px;
+    font-size: 11px;
+    line-height: 1.2;
+    flex-shrink: 0;
+}
+
+.status-cell-views {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary, #9ca3af);
+    letter-spacing: 0.01em;
+}
+
+.status-cell-views i {
+    color: var(--accent-blue, #60a5fa);
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .status-cell {
+        gap: 6px;
+    }
+    .status-cell-badges {
+        gap: 5px;
+    }
+    .status-cell .status-badge,
+    .status-cell .popular-status-pill {
+        font-size: 10px;
+        padding: 3px 8px;
+    }
+    .status-cell-views {
+        font-size: 11px;
+    }
+}

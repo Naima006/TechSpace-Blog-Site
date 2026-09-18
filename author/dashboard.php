@@ -334,7 +334,7 @@ $show_form = $edit_post || (isset($_GET['action_mode']) && $_GET['action_mode'] 
                         $badge = $st === 'pending' ? 'status-pending' : 'status-published';
                 ?>
                     <tr class="table-data-row">
-                        <td class="record-id-badge">#<?php echo $serial; ?></td>
+                        <td class="record-id-badge"><?php echo $serial; ?></td>
                         <td><span class="table-row-title"><?php echo htmlspecialchars($p['title']); ?></span></td>
                         <td><span class="status-badge <?php echo $badge; ?>"><?php echo htmlspecialchars($st); ?></span></td>
                         <td><?php echo number_format((int)$p['view_count']); ?></td>

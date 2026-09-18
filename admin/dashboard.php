@@ -620,8 +620,11 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
             <div class="posts-card">
                 <div class="table-header-action-row">
                     <div class="table-title-area">
-                        <h3><i class="fa-solid fa-users text-blue-icon"></i> Author Management Panel</h3>
-                        <p class="row-count-tracker">Review active system content creators</p>
+                        <h3 style="display: inline-flex; align-items: center; gap: 10px; margin: 0;">
+                            <i class="fa-solid fa-users text-blue-icon"></i>
+                            Author Management Panel
+                        </h3>
+                        <p class="row-count-tracker" style="padding-left: 30px;">Review active system content creators</p>
                     </div>
                     <div style="display: flex; gap: 12px;">
                         <a href="dashboard.php" class="initialize-creation-btn" style="background: rgba(96, 165, 250, 0.1); color: var(--accent-blue); border-color: rgba(96, 165, 250, 0.25);">
@@ -650,8 +653,8 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                                 $auth_serial = count($authors);
                                 foreach ($authors as $auth) {
                             ?>
-                                                                        <tr class="table-data-row">
-                                        <td class="record-id-badge">#<?php echo $auth_serial; ?></td>
+                                    <tr class="table-data-row">
+                                        <td class="record-id-badge"><?php echo $auth_serial; ?></td>
                                         <td><span class="table-row-title"><?php echo htmlspecialchars($auth['author_name']); ?></span></td>
                                         <td><span style="font-size:12px;color:var(--text-secondary);"><?php echo htmlspecialchars($auth['email'] ?? '—'); ?></span></td>
                                         <td><?php
@@ -709,7 +712,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                 <div class="table-header-action-row">
                     <div class="table-title-area">
                         <h3><i class="fa-solid fa-database text-blue-icon" style="padding-right: 5px;"></i> Content Management</h3>
-                        <p class="row-count-tracker" style="padding-top: 5px; margin: 0; padding-left: 30px;">Showing <?php echo $total_rows; ?> posts</p>
+                        <p class="row-count-tracker" style="padding-top: 5px; margin: 0; padding-left: 30px;">Showing &nbsp <?php echo $total_rows; ?> &nbsp posts</p>
                     </div>
                     <div class="content-mgmt-actions">
                         <form method="GET" action="dashboard.php" class="portal-search-wrap">
@@ -729,7 +732,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                                 <th width="10%">Post No</th>
                                 <th width="35%">Post Title</th>
                                 <th width="22%">Cover Image</th>
-                                <th width="13%">Status</th>
+                                <th width="16%">Status</th>
                                 <th width="20%" style="text-align: right; padding-right: 25px;">Actions</th>
                             </tr>
                         </thead>
@@ -739,7 +742,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                                 while ($p = mysqli_fetch_assoc($posts)) { 
                             ?>
                                     <tr class="table-data-row">
-                                        <td class="record-id-badge">#<?php echo $serial_num; ?></td>
+                                        <td class="record-id-badge"><?php echo $serial_num; ?></td>
                                         <td>
                                             <div class="identity-meta-container">
                                                 <span class="table-row-title"><?php echo htmlspecialchars($p['title']); ?></span>
@@ -755,21 +758,21 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                                             </div>
                                         </td>
                                         <td>
-                                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                                <span style="font-size: 13px; color: #e5e7eb; font-weight: 500;">
-                                                    <i class="fa-regular fa-eye" style="color: var(--accent-blue); margin-right: 4px;"></i> 
-                                                    <?php echo number_format($p['view_count']); ?> views
-                                                </span>
+                                            <div class="status-cell">
                                                 <?php
                                                     $pst = $p['status'] ?? 'published';
                                                     $pcls = $pst === 'pending' ? 'status-pending' : 'status-published';
                                                 ?>
-                                                <span class="status-badge <?php echo $pcls; ?>" style="margin-left:8px;"><?php echo htmlspecialchars($pst); ?></span>
-                                                <?php if ($p['view_count'] > 500) { ?>
-                                                    <span class="popular-status-pill" style="width: max-content; padding: 2px 8px; font-size: 11px;">
-                                                        <i class="fa-solid fa-fire-flame-curved"></i> Popular
-                                                    </span>
-                                                <?php } ?>
+                                                <div class="status-cell-badges">
+                                                    <span class="status-badge <?php echo $pcls; ?>"><?php echo htmlspecialchars($pst); ?></span>
+                                                    <?php if ((int)$p['view_count'] > 500) { ?>
+                                                    <span class="popular-status-pill"><i class="fa-solid fa-fire-flame-curved"></i> Popular</span>
+                                                    <?php } ?>
+                                                </div>
+                                                <span class="status-cell-views" title="Total views">
+                                                    <i class="fa-regular fa-eye"></i>
+                                                    <?php echo number_format((int)$p['view_count']); ?>
+                                                </span>
                                             </div>
                                         </td>
                                         <td style="text-align: right; padding-right: 20px;">
