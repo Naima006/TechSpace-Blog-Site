@@ -1864,3 +1864,60 @@ html {
         font-size: 11px;
     }
 }
+
+
+
+/* TinyMCE: match glass form fields, hide clutter */
+.tox-tinymce {
+    border-radius: 10px !important;
+    border: 1px solid var(--glass-border, rgba(255,255,255,0.07)) !important;
+    background: rgba(0, 0, 0, 0.35) !important;
+    overflow: hidden;
+    box-shadow: none !important;
+}
+.tox-tinymce:hover {
+    border-color: rgba(96, 165, 250, 0.35) !important;
+}
+.tox .tox-editor-header {
+    background: rgba(0, 0, 0, 0.25) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    padding: 4px 6px !important;
+    box-shadow: none !important;
+}
+.tox .tox-toolbar,
+.tox .tox-toolbar__primary,
+.tox .tox-toolbar__overflow,
+.tox .tox-menubar {
+    background: transparent !important;
+}
+.tox .tox-toolbar__group {
+    border: none !important;
+}
+.tox .tox-tbtn,
+.tox .tox-split-button {
+    color: #9ca3af !important;
+}
+.tox .tox-tbtn:hover,
+.tox .tox-split-button:hover {
+    background: rgba(96, 165, 250, 0.12) !important;
+    color: #e5e7eb !important;
+}
+.tox .tox-tbtn--enabled,
+.tox .tox-tbtn--enabled:hover {
+    background: rgba(96, 165, 250, 0.2) !important;
+    color: #60a5fa !important;
+}
+.tox .tox-edit-area__iframe {
+    background: rgba(0, 0, 0, 0.35) !important;
+}
+.tox .tox-statusbar {
+    display: none !important;
+}
+.tox-editor-container {
+    background: transparent !important;
+}
+/* Focus ring aligned with other inputs */
+.tox-tinymce.tox-edit-focus {
+    border-color: var(--accent-blue, #60a5fa) !important;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12) !important;
+}

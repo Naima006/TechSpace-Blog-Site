@@ -278,6 +278,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
     <link rel="stylesheet" href="../style.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/tinymce@7.6.0/tinymce.min.js" referrerpolicy="origin"></script>
 </head>
 <body class="dashboard-body" id="dashboardViewportBackdrop">
 
@@ -357,7 +358,14 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                 </div>
 
                 <h1 class="inspect-article-title"><?php echo htmlspecialchars($view_post['title']); ?></h1>
-                <div class="inspect-article-body"><?php echo htmlspecialchars($view_post['content']); ?></div>
+                <div class="inspect-article-body post-html-body"><?php
+                    $vc = $view_post['content'];
+                    if (preg_match('/<(p|br|strong|b|em|i|u|ul|ol|li|a|h[1-6])\b/i', $vc)) {
+                        echo strip_tags($vc, '<p><br><br/><strong><b><em><i><u><ul><ol><li><a><h2><h3><h4><blockquote>');
+                    } else {
+                        echo nl2br(htmlspecialchars($vc));
+                    }
+                ?></div>
 
                 <div class="inspect-action-footer-toolbar">
                     <a href="dashboard.php" class="toolbar-btn back-btn">
@@ -557,7 +565,7 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
 
                     <div class="input-group" style="margin-top: 15px;">
                         <label>Content Body</label>
-                        <textarea name="content" id="admin_post_content" placeholder="Compile text array elements here..." required><?php echo htmlspecialchars($edit_post['content'] ?? ''); ?></textarea>
+                        <textarea name="content" id="admin_post_content" placeholder="Write your article content..."><?php echo htmlspecialchars($edit_post['content'] ?? ''); ?></textarea>
                     </div>
 
                     <div class="form-button-cluster">
@@ -602,9 +610,14 @@ $dismiss_target_url = (isset($_GET['action_mode']) && ($_GET['action_mode'] === 
                                 <div class="views-chip"><i class="fa-solid fa-eye"></i> <span id="admin_live_views"><?php echo $edit_post ? number_format((int)($edit_post['view_count'] ?? 0)) : '0'; ?></span> views</div>
                             </div>
                             <h2 class="preview-title" id="admin_live_title"><?php echo htmlspecialchars($edit_post['title'] ?? 'Your title appears here'); ?></h2>
-                            <div class="preview-body-text" id="admin_live_excerpt"><?php
-                                $ex = $edit_post['content'] ?? 'Your full article content will appear here as you type — matching the public article view.';
-                                echo nl2br(htmlspecialchars($ex));
+                            <div class="preview-body-text post-html-body" id="admin_live_excerpt"><?php
+                                $ex = $edit_post['content'] ?? 'Your full article content will appear here as you type.';
+                                $has_html = preg_match('/<(p|br|strong|b|em|i|u|ul|ol|li|a|h[1-6])\b/i', $ex);
+                                if ($has_html) {
+                                    echo strip_tags($ex, '<p><br><br/><strong><b><em><i><u><ul><ol><li><a><h2><h3><h4><blockquote>');
+                                } else {
+                                    echo nl2br(htmlspecialchars($ex));
+                                }
                             ?></div>
                         </div>
                     </div>
@@ -876,7 +889,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // --- Post editor live preview (full article card) ---
+    // --- Post editor: TinyMCE + live preview ---
     (function () {
         var titleIn = document.getElementById('admin_post_title');
         var contentIn = document.getElementById('admin_post_content');
@@ -887,15 +900,57 @@ document.addEventListener("DOMContentLoaded", function() {
         var liveCover = document.getElementById('admin_live_cover');
         var liveAuthor = document.getElementById('admin_live_author');
         if (!titleIn || !liveTitle) return;
+
         titleIn.addEventListener('input', function () {
             liveTitle.textContent = this.value || 'Your title appears here';
         });
-        if (contentIn && liveExcerpt) {
+
+        function updateContentPreview(html) {
+            if (!liveExcerpt) return;
+            var fallback = 'Your full article content will appear here as you type.';
+            if (!html || html === '' || html === '<p></p>' || html === '<p><br></p>') {
+                liveExcerpt.textContent = fallback;
+            } else {
+                liveExcerpt.innerHTML = html;
+            }
+        }
+
+        if (contentIn && typeof tinymce !== 'undefined') {
+            tinymce.init({
+                selector: '#admin_post_content',
+                height: 300,
+                menubar: false,
+                branding: false,
+                promotion: false,
+                statusbar: false,
+                elementpath: false,
+                plugins: 'lists link autoresize',
+                toolbar: 'undo redo | styles | bold italic underline | bullist numlist | link | removeformat',
+                skin: 'oxide-dark',
+                content_css: 'dark',
+                placeholder: 'Start writing your blog here...',
+                content_style: 'body { font-family: Plus Jakarta Sans, sans-serif; font-size: 14px; color: #e5e7eb; background-color: #0b0f19; } body[data-mce-placeholder]:before { color: #6b7280 !important; }',
+                setup: function (editor) {
+                    editor.on('init change keyup SetContent', function () {
+                        editor.save();
+                        updateContentPreview(editor.getContent());
+                    });
+                    var form = editor.getElement().form;
+                    if (form) {
+                        form.addEventListener('submit', function (e) {
+                            editor.save();
+                            var c = editor.getContent({ format: 'text' }).trim();
+                            if (!c) { e.preventDefault(); alert('Please write some article content.'); }
+                        });
+                    }
+                }
+            });
+        } else if (contentIn && liveExcerpt) {
             contentIn.addEventListener('input', function () {
-                var t = this.value || 'Your full article content will appear here as you type — matching the public article view.';
-                liveExcerpt.innerText = t;
+                liveExcerpt.innerText = this.value || 'Your full article content will appear here as you type.';
             });
         }
+
         if (coverIn && liveCover) {
             coverIn.addEventListener('change', function () {
                 if (this.files && this.files[0]) {

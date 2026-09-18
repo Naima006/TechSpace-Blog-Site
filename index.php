@@ -145,15 +145,23 @@ for ($i = 0; $i < 6; $i++) {
             <li><a href="index.php?page=contact" class="<?php echo ($page === 'contact') ? 'active' : ''; ?>"><i class="fa-solid rel-icon fa-envelope"></i> Contact</a></li>
         </ul>
         <div class="nav-right-cluster">
-            <form method="GET" action="index.php" class="nav-search-form">
-                <div class="search-box">
+            <form method="GET" action="index.php" class="nav-search-form" id="liveSearchForm" autocomplete="off">
+                <div class="search-box" id="liveSearchBox">
                     <input
                         type="text"
                         name="search"
+                        id="liveSearchInput"
                         placeholder="Search..."
                         value="<?php echo htmlspecialchars($search); ?>"
-                        aria-label="Search articles">
+                        aria-label="Search articles"
+                        aria-autocomplete="list"
+                        aria-controls="liveSearchDropdown"
+                        aria-expanded="false">
                     <i class="fa-solid fa-magnifying-glass search-icon" aria-hidden="true"></i>
+                    <button type="button" class="search-clear-btn" id="liveSearchClear" title="Clear search" aria-label="Clear search" hidden>
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    <div class="live-search-dropdown" id="liveSearchDropdown" role="listbox" hidden></div>
                 </div>
             </form>
             <div class="nav-auth-actions">
@@ -227,9 +235,45 @@ for ($i = 0; $i < 6; $i++) {
                     </div>
 
                     <h2><?php echo $selected_post['title']; ?></h2>
-                    <p class="full-content"><?php echo nl2br($selected_post['content']); ?></p>
-                    <br>
-                    <a href="index.php" class="show-more-btn">← Back </a>
+                    <div class="full-content post-html-body"><?php
+                        $pc = $selected_post['content'];
+                        if (preg_match('/<(p|br|strong|b|em|i|u|ul|ol|li|a|h[1-6])\b/i', $pc)) {
+                            echo strip_tags($pc, '<p><br><br/><strong><b><em><i><u><ul><ol><li><a><h2><h3><h4><blockquote>');
+                        } else {
+                            echo nl2br(htmlspecialchars($pc));
+                        }
+                    ?></div>
+                                        <div class="post-footer-actions">
+                        <a href="index.php" class="post-back-btn"><i class="fa-solid fa-arrow-left"></i> Back</a>
+<div class="post-share-bar">
+                        <span class="post-share-label">Share</span>
+                        <div class="post-share-actions">
+                            <?php
+                            $share_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                                . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
+                                . dirname($_SERVER['SCRIPT_NAME'] ?? '')
+                                . '/index.php?post=' . (int)$selected_post['post_id'];
+                            $share_url = preg_replace('#(?<!:)/{2,}#', '/', $share_url);
+                            $share_title = $selected_post['title'];
+                            $enc_url = rawurlencode($share_url);
+                            $enc_title = rawurlencode($share_title);
+                            ?>
+                            <a class="share-btn" href="https://twitter.com/intent/tweet?url=<?php echo $enc_url; ?>&text=<?php echo $enc_title; ?>" target="_blank" rel="noopener noreferrer" title="Share on X">
+                                <i class="fab fa-x-twitter"></i>
+                            </a>
+                            <a class="share-btn" href="https://www.facebook.com/sharer/sharer.php?u=<?php echo $enc_url; ?>" target="_blank" rel="noopener noreferrer" title="Share on Facebook">
+                                <i class="fab fa-facebook-f"></i>
+                            </a>
+                            <a class="share-btn" href="https://www.linkedin.com/sharing/share-offsite/?url=<?php echo $enc_url; ?>" target="_blank" rel="noopener noreferrer" title="Share on LinkedIn">
+                                <i class="fab fa-linkedin-in"></i>
+                            </a>
+                            <button type="button" class="share-btn share-copy-btn" data-url="<?php echo htmlspecialchars($share_url, ENT_QUOTES); ?>" title="Copy link">
+                                <i class="fa-solid fa-link"></i>
+                            </button>
+                        </div>
+                    </div>
+                                        </div>
+
                 </div>
             </div>
 
@@ -261,8 +305,9 @@ for ($i = 0; $i < 6; $i++) {
                             <h2><?php echo $row['title']; ?></h2>
                             <p class="excerpt">
                                 <?php
-                                echo substr($row['content'], 0, 180);
-                                if (strlen($row['content']) > 180) { echo "..."; }
+                                $plain = trim(preg_replace('/\s+/', ' ', strip_tags($row['content'])));
+                                echo htmlspecialchars(mb_substr($plain, 0, 180));
+                                if (mb_strlen($plain) > 180) { echo "..."; }
                                 ?>
                             </p>
                         </div>
@@ -549,6 +594,194 @@ for ($i = 0; $i < 6; $i++) {
             });
         }
     });
+
+    // Live search-as-you-type + keyboard navigation
+    (function () {
+        var input = document.getElementById('liveSearchInput');
+        var box = document.getElementById('liveSearchBox');
+        var dropdown = document.getElementById('liveSearchDropdown');
+        var clearBtn = document.getElementById('liveSearchClear');
+        if (!input || !dropdown) return;
+
+        var timer = null;
+        var lastQ = '';
+        var activeIndex = -1;
+
+        function setClearVisible() {
+            if (!clearBtn) return;
+            var hasText = input.value.trim() !== '';
+            clearBtn.hidden = !hasText;
+            clearBtn.classList.toggle('is-visible', hasText);
+        }
+
+        function hideDropdown() {
+            dropdown.hidden = true;
+            dropdown.innerHTML = '';
+            input.setAttribute('aria-expanded', 'false');
+            activeIndex = -1;
+        }
+
+        function getItems() {
+            return Array.prototype.slice.call(dropdown.querySelectorAll('.live-search-item'));
+        }
+
+        function setActive(index) {
+            var items = getItems();
+            if (!items.length) {
+                activeIndex = -1;
+                return;
+            }
+            if (index < 0) index = items.length - 1;
+            if (index >= items.length) index = 0;
+            activeIndex = index;
+            items.forEach(function (el, i) {
+                el.classList.toggle('is-active', i === activeIndex);
+            });
+            items[activeIndex].scrollIntoView({ block: 'nearest' });
+        }
+
+        function showDropdown(html) {
+            dropdown.innerHTML = html;
+            dropdown.hidden = false;
+            input.setAttribute('aria-expanded', 'true');
+            activeIndex = -1;
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, function (c) {
+                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+            });
+        }
+
+        function renderResults(items) {
+            if (!items.length) {
+                showDropdown('<div class="live-search-empty">No matching articles</div>');
+                return;
+            }
+            var html = items.map(function (item, i) {
+                return '<a class="live-search-item" role="option" id="liveSearchOpt' + i + '" href="' + escapeHtml(item.url) + '">'
+                    + '<span class="live-search-item-title">' + escapeHtml(item.title) + '</span>'
+                    + '<span class="live-search-item-meta">'
+                    + escapeHtml(item.author) + ' · ' + Number(item.views).toLocaleString() + ' views'
+                    + '</span></a>';
+            }).join('');
+            showDropdown(html);
+        }
+
+        function fetchSuggestions(q) {
+            if (q.length < 2) {
+                hideDropdown();
+                return;
+            }
+            if (q === lastQ) return;
+            lastQ = q;
+            fetch('search-api.php?q=' + encodeURIComponent(q))
+                .then(function (r) { return r.json(); })
+                .then(function (data) { renderResults(data.results || []); })
+                .catch(function () { hideDropdown(); });
+        }
+
+        input.addEventListener('input', function () {
+            setClearVisible();
+            var q = input.value.trim();
+            clearTimeout(timer);
+            if (q.length < 2) {
+                hideDropdown();
+                lastQ = '';
+                return;
+            }
+            timer = setTimeout(function () { fetchSuggestions(q); }, 220);
+        });
+
+        input.addEventListener('focus', function () {
+            setClearVisible();
+            var q = input.value.trim();
+            if (q.length >= 2) fetchSuggestions(q);
+        });
+
+        input.addEventListener('keydown', function (e) {
+            var items = getItems();
+            var open = !dropdown.hidden && items.length > 0;
+
+            if (e.key === 'ArrowDown') {
+                if (!open) return;
+                e.preventDefault();
+                setActive(activeIndex + 1);
+            } else if (e.key === 'ArrowUp') {
+                if (!open) return;
+                e.preventDefault();
+                setActive(activeIndex - 1);
+            } else if (e.key === 'Enter') {
+                if (open && activeIndex >= 0 && items[activeIndex]) {
+                    e.preventDefault();
+                    window.location.href = items[activeIndex].getAttribute('href');
+                }
+                // else allow normal form submit for full results
+            } else if (e.key === 'Escape') {
+                hideDropdown();
+                input.blur();
+            }
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                input.value = '';
+                setClearVisible();
+                hideDropdown();
+                lastQ = '';
+                var params = new URLSearchParams(window.location.search);
+                if (params.has('search')) {
+                    window.location.href = 'index.php';
+                } else {
+                    input.focus();
+                }
+            });
+        }
+
+        document.addEventListener('click', function (e) {
+            if (box && !box.contains(e.target)) hideDropdown();
+        });
+
+        setClearVisible();
+    })();
+
+    // Copy link on single post
+    (function () {
+        var btn = document.querySelector('.share-copy-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var url = btn.getAttribute('data-url') || window.location.href;
+            function toast(ok) {
+                var prev = btn.getAttribute('title');
+                btn.classList.add(ok ? 'copied' : '');
+                btn.setAttribute('title', ok ? 'Copied!' : prev);
+                var icon = btn.querySelector('i');
+                if (icon && ok) {
+                    icon.className = 'fa-solid fa-check';
+                    setTimeout(function () {
+                        icon.className = 'fa-solid fa-link';
+                        btn.classList.remove('copied');
+                        btn.setAttribute('title', 'Copy link');
+                    }, 1600);
+                }
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(function () { toast(true); }).catch(function () { toast(false); });
+            } else {
+                var ta = document.createElement('textarea');
+                ta.value = url;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); toast(true); } catch (err) { toast(false); }
+                document.body.removeChild(ta);
+            }
+        });
+    })();
+
     </script>
 
 
