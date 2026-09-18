@@ -65,7 +65,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
         WHERE blog_posts.status = 'published'
           AND (blog_posts.title LIKE '%$search%' 
            OR authors.author_name LIKE '%$search%')
-        ORDER BY published_date DESC
+        ORDER BY view_count DESC, published_date DESC
         LIMIT $limit OFFSET $offset
     ";
 } elseif ($month && $year) {
@@ -76,7 +76,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
         WHERE blog_posts.status = 'published'
         AND MONTH(published_date) = $month
         AND YEAR(published_date) = $year
-        ORDER BY published_date DESC
+        ORDER BY view_count DESC, published_date DESC
         LIMIT $limit OFFSET $offset
     ";
 } else {
@@ -85,7 +85,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
         FROM blog_posts
         JOIN authors ON blog_posts.author_id = authors.author_id
         WHERE blog_posts.status = 'published'
-        ORDER BY published_date DESC
+        ORDER BY view_count DESC, published_date DESC
         LIMIT $limit OFFSET $offset
     ";
 }
@@ -98,16 +98,16 @@ $popular = mysqli_query(
     "SELECT * FROM blog_posts WHERE status = 'published' AND view_count > 500 ORDER BY view_count DESC LIMIT 5"
 );
 
-$archives = mysqli_query(
-    $conn,
-    "SELECT
-        post_id,
-        title,
-        DATE_FORMAT(published_date, '%M %Y') AS archive_month
-        FROM blog_posts
-        WHERE status = 'published'
-        ORDER BY published_date DESC"
-);
+/* Archive: last 6 calendar months including the current month (newest first) */
+$archive_months = [];
+for ($i = 0; $i < 6; $i++) {
+    $ts = strtotime("first day of -{$i} month");
+    $archive_months[] = [
+        'month' => (int) date('n', $ts),
+        'year'  => (int) date('Y', $ts),
+        'label' => date('F Y', $ts),
+    ];
+}
 ?>
 
 <!DOCTYPE html>
@@ -456,10 +456,15 @@ $archives = mysqli_query(
             <div class="sidebar-widget">
                 <h3><i class="fa-solid fa-box-archive text-accent"></i> Archive</h3>
                 <ul class="archive-list">
-                    <li><a href="index.php?month=4&year=2026"><i class="fa-regular fa-calendar-days list-bullet"></i> April 2026</a></li>
-                    <li><a href="index.php?month=3&year=2026"><i class="fa-regular fa-calendar-days list-bullet"></i> March 2026</a></li>
-                    <li><a href="index.php?month=2&year=2026"><i class="fa-regular fa-calendar-days list-bullet"></i> February 2026</a></li>
-                    <li><a href="index.php?month=1&year=2026"><i class="fa-regular fa-calendar-days list-bullet"></i> January 2026</a></li>
+                    <?php foreach ($archive_months as $am) { ?>
+                    <li>
+                        <a href="index.php?month=<?php echo (int)$am['month']; ?>&year=<?php echo (int)$am['year']; ?>"
+                           class="<?php echo ($month === (int)$am['month'] && $year === (int)$am['year']) ? 'active' : ''; ?>">
+                            <i class="fa-regular fa-calendar-days list-bullet"></i>
+                            <?php echo htmlspecialchars($am['label']); ?>
+                        </a>
+                    </li>
+                    <?php } ?>
                 </ul>
             </div>
         </div>

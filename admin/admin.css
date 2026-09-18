@@ -1701,3 +1701,100 @@ html {
         font-size: 18px;
     }
 }
+
+/* ---------- Login fields: kill white autofill, match dark glass ---------- */
+.login-card input[type="text"],
+.login-card input[type="email"],
+.login-card input[type="password"],
+.login-card input[type="file"] {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.35) !important;
+    color: var(--text-primary) !important;
+    outline: none;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    box-sizing: border-box;
+}
+
+.login-card input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.85;
+}
+
+.login-card input:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
+}
+
+/* Chrome / Safari / Edge autofill was painting fields white */
+.login-card input:-webkit-autofill,
+.login-card input:-webkit-autofill:hover,
+.login-card input:-webkit-autofill:focus,
+.login-card input:-webkit-autofill:active {
+    -webkit-text-fill-color: #f3f4f6 !important;
+    caret-color: #f3f4f6;
+    box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.45) inset !important;
+    transition: background-color 99999s ease-out 0s;
+    border: 1px solid var(--glass-border);
+}
+
+/* ---------- Modern file picker (avatar upload) ---------- */
+.login-card .file-upload-field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.35);
+    box-sizing: border-box;
+}
+
+.login-card .file-upload-field:hover {
+    border-color: rgba(96, 165, 250, 0.35);
+}
+
+.login-card .file-upload-field input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    z-index: -1;
+}
+
+.login-card .file-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    background: rgba(96, 165, 250, 0.12);
+    color: var(--accent-blue);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.25s, border-color 0.25s;
+}
+
+.login-card .file-upload-btn:hover {
+    background: rgba(96, 165, 250, 0.22);
+    border-color: rgba(96, 165, 250, 0.5);
+}
+
+.login-card .file-upload-name {
+    font-size: 13px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}

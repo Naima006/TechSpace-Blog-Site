@@ -168,7 +168,11 @@ if (isset($_POST['author_register'])) {
                 </button>
             </div>
             <label style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Avatar (optional)</label>
-            <input type="file" name="avatar_file" accept="image/*">
+            <div class="file-upload-field">
+                <input type="file" name="avatar_file" id="avatarFileInput" accept="image/*">
+                <label for="avatarFileInput" class="file-upload-btn"><i class="fa-solid fa-image"></i> Choose image</label>
+                <span class="file-upload-name" id="avatarFileName">No file chosen</span>
+            </div>
             <button type="submit" name="author_register">Submit Registration</button>
         </form>
         <?php } ?>
@@ -214,6 +218,18 @@ document.querySelectorAll('.toggle-password-btn[data-target]').forEach(function 
         }
     });
 });
+</script>
+
+
+<script>
+(function () {
+    var input = document.getElementById('avatarFileInput');
+    var nameEl = document.getElementById('avatarFileName');
+    if (!input || !nameEl) return;
+    input.addEventListener('change', function () {
+        nameEl.textContent = (this.files && this.files[0]) ? this.files[0].name : 'No file chosen';
+    });
+})();
 </script>
 
 </body>
