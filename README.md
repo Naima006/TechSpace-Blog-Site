@@ -174,7 +174,7 @@ db_blog
 
 | Role    | Capabilities                                                 |
 | ------- | ------------------------------------------------------------ |
-| Visitor | Read posts, search articles, register as an author           |
+| Visitor | Read posts, search & share articles, register as an author   |
 | Author  | Create and edit own articles after approval                  |
 | Admin   | Manage posts, authors, approvals, settings, and site content |
 
@@ -194,20 +194,6 @@ For deployment:
 4. Make sure the required upload directories are writable.
 5. Change the default admin credentials before making the site publicly available.
 6. Test the public site, admin panel, author workspace, database operations, and image uploads.
-
----
-
-## Screenshots
-
-Screenshots can be added to a `screenshots/` folder and referenced here.
-
-Example:
-
-```markdown
-![Home](screenshots/home.png)
-![Admin Dashboard](screenshots/admin.png)
-![Author Dashboard](screenshots/author.png)
-```
 
 ---
 
